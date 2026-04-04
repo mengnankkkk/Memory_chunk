@@ -1,0 +1,117 @@
+syntax = "proto3";
+
+package refiner.v1;
+
+option go_package = "context-refiner/api/refinerv1;refinerv1";
+
+message Message {
+  string role = 1;
+  string content = 2;
+}
+
+enum FragmentType {
+  FRAGMENT_TYPE_UNSPECIFIED = 0;
+  FRAGMENT_TYPE_TITLE = 1;
+  FRAGMENT_TYPE_BODY = 2;
+  FRAGMENT_TYPE_CODE = 3;
+  FRAGMENT_TYPE_TABLE = 4;
+  FRAGMENT_TYPE_JSON = 5;
+  FRAGMENT_TYPE_TOOL_OUTPUT = 6;
+  FRAGMENT_TYPE_LOG = 7;
+  FRAGMENT_TYPE_ERROR_STACK = 8;
+}
+
+message RagFragment {
+  FragmentType type = 1;
+  string content = 2;
+  string language = 3;
+}
+
+message RagChunk {
+  string id = 1;
+  string source = 2;
+  string content = 3;
+  repeated RagFragment fragments = 4;
+  repeated string sources = 5;
+}
+
+message PagedChunk {
+  string chunk_id = 1;
+  repeated string page_keys = 2;
+  string session_id = 3;
+  string request_id = 4;
+}
+
+message ModelConfig {
+  string model = 1;
+  int32 max_context_tokens = 2;
+}
+
+message RefineRequest {
+  repeated Message messages = 1;
+  repeated RagChunk rag_chunks = 2;
+  ModelConfig model = 3;
+  int32 token_budget = 4;
+  string policy = 5;
+  string session_id = 6;
+  string request_id = 7;
+}
+
+message ProcessorCapabilities {
+  bool aggressive = 1;
+  bool lossy = 2;
+  bool structured_input_only = 3;
+  int32 min_trigger_tokens = 4;
+  bool preserve_citation = 5;
+}
+
+message StepSemanticAudit {
+  repeated string removed = 1;
+  repeated string retained = 2;
+  repeated string reasons = 3;
+  bool source_preserved = 4;
+  bool code_fence_preserved = 5;
+  bool error_stack_preserved = 6;
+  int32 dropped_citations = 7;
+}
+
+message StepAudit {
+  string name = 1;
+  int32 before_tokens = 2;
+  int32 after_tokens = 3;
+  int64 duration_ms = 4;
+  map<string, string> details = 5;
+  ProcessorCapabilities capabilities = 6;
+  StepSemanticAudit semantic = 7;
+}
+
+message RefineResponse {
+  string optimized_prompt = 1;
+  int32 input_tokens = 2;
+  int32 output_tokens = 3;
+  repeated StepAudit audits = 4;
+  repeated PagedChunk paged_chunks = 5;
+  map<string, string> metadata = 6;
+  bool budget_met = 7;
+  repeated string pending_summary_job_ids = 8;
+}
+
+message PageInRequest {
+  repeated string page_keys = 1;
+}
+
+message StoredPage {
+  string key = 1;
+  string content = 2;
+  bool is_summary = 3;
+  string summary_job_id = 4;
+}
+
+message PageInResponse {
+  repeated StoredPage pages = 1;
+}
+
+service RefinerService {
+  rpc Refine(RefineRequest) returns (RefineResponse);
+  rpc PageIn(PageInRequest) returns (PageInResponse);
+}

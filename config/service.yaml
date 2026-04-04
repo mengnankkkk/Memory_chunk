@@ -1,0 +1,27 @@
+grpc:
+  listen_addr: ""
+
+redis:
+  addr: ""
+  username: ""
+  password: ""
+  db: 0
+  key_prefix: "context-refiner:page"
+  page_ttl: "24h"
+  summary_stream: "context-refiner:summary-jobs"
+
+tokenizer:
+  model: "gpt-4o-mini"
+  fallback_encoding: "cl100k_base"
+
+pipeline:
+  policy_file: "config/policies.yaml"
+  default_policy: "strict_coding_assistant"
+  paging_token_threshold: 320
+
+summary_worker:
+  enabled: true
+  consumer_group: "context-refiner-summary"
+  consumer_name: "worker-1"
+  batch_size: 8
+  block_timeout: "2s"

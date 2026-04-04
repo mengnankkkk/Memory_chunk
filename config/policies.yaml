@@ -1,0 +1,11 @@
+policies:
+  - name: "strict_coding_assistant"
+    budget_ratio: 0.9
+    steps: ["paging", "collapse", "compact", "json_trim", "table_reduce", "code_outline", "error_stack_focus", "snip", "auto_compact_sync", "auto_compact_async", "assemble"]
+    snip_params:
+      keep_head_lines: 18
+      keep_tail_lines: 8
+  - name: "creative_chat"
+    budget_ratio: 1.0
+    steps: ["collapse", "compact", "table_reduce", "auto_compact_sync", "auto_compact_async", "assemble"]
+    auto_compact_threshold: 4000
