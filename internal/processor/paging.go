@@ -84,7 +84,7 @@ func paginateChunk(counter engine.TokenCounter, chunk engine.RAGChunk, pageLimit
 	currentTokens := 0
 
 	for _, fragment := range chunk.Fragments {
-		splitParts := splitFragmentByTokens(counter, fragment, pageLimit)
+		splitParts := splitFragmentByTokenBudget(counter, fragment, pageLimit)
 		for _, part := range splitParts {
 			partTokens := counter.CountFragment(part)
 			if currentTokens > 0 && currentTokens+partTokens > pageLimit {

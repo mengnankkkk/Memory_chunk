@@ -61,6 +61,8 @@ pkg/
 关键文件：
 
 - [cmd/main.go](/E:/github/Memory_chunk/cmd/main.go)
+- [cmd/runtime.go](/E:/github/Memory_chunk/cmd/runtime.go)
+- [cmd/registry.go](/E:/github/Memory_chunk/cmd/registry.go)
 
 ### 3.3 `internal/config/`
 
@@ -93,11 +95,15 @@ pkg/
 职责：
 
 - 具体上下文治理动作
-- 请求拷贝与文本辅助工具
+- 请求拷贝
+- Token 分片
+- chunk 元信息辅助工具
 
 关键文件：
 
-- [internal/processor/helpers.go](/E:/github/Memory_chunk/internal/processor/helpers.go)
+- [internal/processor/request_clone.go](/E:/github/Memory_chunk/internal/processor/request_clone.go)
+- [internal/processor/token_split.go](/E:/github/Memory_chunk/internal/processor/token_split.go)
+- [internal/processor/chunk_metadata.go](/E:/github/Memory_chunk/internal/processor/chunk_metadata.go)
 - [internal/processor/paging.go](/E:/github/Memory_chunk/internal/processor/paging.go)
 - [internal/processor/collapse.go](/E:/github/Memory_chunk/internal/processor/collapse.go)
 - [internal/processor/compact.go](/E:/github/Memory_chunk/internal/processor/compact.go)
@@ -115,19 +121,25 @@ pkg/
 
 关键文件：
 
-- [internal/heuristic/text.go](/E:/github/Memory_chunk/internal/heuristic/text.go)
+- [internal/heuristic/json.go](/E:/github/Memory_chunk/internal/heuristic/json.go)
+- [internal/heuristic/extract.go](/E:/github/Memory_chunk/internal/heuristic/extract.go)
+- [internal/heuristic/lines.go](/E:/github/Memory_chunk/internal/heuristic/lines.go)
 
 ### 3.7 `internal/server/`
 
 职责：
 
 - gRPC handler
-- request / response mapping
+- request mapping
+- response mapping
+- mapping 辅助转换
 
 关键文件：
 
 - [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go)
-- [internal/server/mapping.go](/E:/github/Memory_chunk/internal/server/mapping.go)
+- [internal/server/request_mapping.go](/E:/github/Memory_chunk/internal/server/request_mapping.go)
+- [internal/server/response_mapping.go](/E:/github/Memory_chunk/internal/server/response_mapping.go)
+- [internal/server/mapping_helpers.go](/E:/github/Memory_chunk/internal/server/mapping_helpers.go)
 
 ### 3.8 `internal/store/`
 
@@ -152,7 +164,7 @@ pkg/
 关键文件：
 
 - [internal/summary/worker.go](/E:/github/Memory_chunk/internal/summary/worker.go)
-- [internal/summary/render.go](/E:/github/Memory_chunk/internal/summary/render.go)
+- [internal/summary/summarizer.go](/E:/github/Memory_chunk/internal/summary/summarizer.go)
 
 ### 3.10 `internal/tokenizer/`
 
@@ -275,7 +287,7 @@ type Processor interface {
 
 - 使用真实 Token 分页
 - key 带作用域和内容 hash
-- 入口注册仍在 `cmd/`，但初始化流程已拆成 bootstrap 辅助函数，便于继续扩展
+- 入口注册仍在 `cmd/`，但初始化流程已拆成 `runtime.go` / `registry.go`，便于继续扩展
 
 ### 6.2 `collapse`
 
@@ -433,7 +445,7 @@ session:{session_id}:request:{request_id}:chunk:{chunk_id}:hash:{content_hash}:p
 
 1. 在 `internal/processor/` 新增实现
 2. 实现 `Descriptor()` 和 `Process()`
-3. 在 `cmd/main.go` 注册到 registry
+3. 在 `cmd/registry.go` 注册到 registry
 4. 在 `config/policies.yaml` 中编排步骤
 5. 更新 `docs/todolist.md`
 
@@ -461,18 +473,24 @@ session:{session_id}:request:{request_id}:chunk:{chunk_id}:hash:{content_hash}:p
 推荐顺序：
 
 1. [cmd/main.go](/E:/github/Memory_chunk/cmd/main.go)
-2. [cmd/bootstrap.go](/E:/github/Memory_chunk/cmd/bootstrap.go)
-3. [api/refiner.proto](/E:/github/Memory_chunk/api/refiner.proto)
-4. [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go)
-5. [internal/server/mapping.go](/E:/github/Memory_chunk/internal/server/mapping.go)
-6. [internal/engine/pipeline.go](/E:/github/Memory_chunk/internal/engine/pipeline.go)
-7. [internal/processor/helpers.go](/E:/github/Memory_chunk/internal/processor/helpers.go)
-8. [internal/processor/paging.go](/E:/github/Memory_chunk/internal/processor/paging.go)
-9. [internal/processor/structured.go](/E:/github/Memory_chunk/internal/processor/structured.go)
-10. [internal/heuristic/text.go](/E:/github/Memory_chunk/internal/heuristic/text.go)
-11. [internal/store/redis.go](/E:/github/Memory_chunk/internal/store/redis.go)
-12. [internal/summary/worker.go](/E:/github/Memory_chunk/internal/summary/worker.go)
-13. [internal/summary/render.go](/E:/github/Memory_chunk/internal/summary/render.go)
+2. [cmd/runtime.go](/E:/github/Memory_chunk/cmd/runtime.go)
+3. [cmd/registry.go](/E:/github/Memory_chunk/cmd/registry.go)
+4. [api/refiner.proto](/E:/github/Memory_chunk/api/refiner.proto)
+5. [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go)
+6. [internal/server/request_mapping.go](/E:/github/Memory_chunk/internal/server/request_mapping.go)
+7. [internal/server/response_mapping.go](/E:/github/Memory_chunk/internal/server/response_mapping.go)
+8. [internal/engine/pipeline.go](/E:/github/Memory_chunk/internal/engine/pipeline.go)
+9. [internal/processor/request_clone.go](/E:/github/Memory_chunk/internal/processor/request_clone.go)
+10. [internal/processor/token_split.go](/E:/github/Memory_chunk/internal/processor/token_split.go)
+11. [internal/processor/chunk_metadata.go](/E:/github/Memory_chunk/internal/processor/chunk_metadata.go)
+12. [internal/processor/paging.go](/E:/github/Memory_chunk/internal/processor/paging.go)
+13. [internal/processor/structured.go](/E:/github/Memory_chunk/internal/processor/structured.go)
+14. [internal/heuristic/json.go](/E:/github/Memory_chunk/internal/heuristic/json.go)
+15. [internal/heuristic/extract.go](/E:/github/Memory_chunk/internal/heuristic/extract.go)
+16. [internal/heuristic/lines.go](/E:/github/Memory_chunk/internal/heuristic/lines.go)
+17. [internal/store/redis.go](/E:/github/Memory_chunk/internal/store/redis.go)
+18. [internal/summary/worker.go](/E:/github/Memory_chunk/internal/summary/worker.go)
+19. [internal/summary/summarizer.go](/E:/github/Memory_chunk/internal/summary/summarizer.go)
 
 ## 11. 当前代码设计的优点与局限
 

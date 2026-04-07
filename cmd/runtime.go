@@ -8,8 +8,6 @@ import (
 
 	refinerv1 "context-refiner/api/refinerv1"
 	"context-refiner/internal/config"
-	"context-refiner/internal/engine"
-	"context-refiner/internal/processor"
 	"context-refiner/internal/server"
 	"context-refiner/internal/store"
 	"context-refiner/internal/summary"
@@ -20,22 +18,15 @@ import (
 
 type appRuntime struct {
 	cfg        *config.AppConfig
-	policies   map[string]engine.RuntimePolicy
-	counter    engine.TokenCounter
 	pageStore  *store.RedisStore
-	registry   *engine.Registry
 	grpcServer *grpc.Server
 }
 
 func loadRuntime(ctx context.Context, configPath string) (*appRuntime, error) {
-	cfg, err := config.LoadAppConfig(configPath)
+	cfg, err := loadConfig(configPath)
 	if err != nil {
 		return nil, err
 	}
-	if err := cfg.Validate(); err != nil {
-		return nil, err
-	}
-
 	policies, err := config.LoadPolicies(cfg.Pipeline.PolicyFile)
 	if err != nil {
 		return nil, err
@@ -61,12 +52,20 @@ func loadRuntime(ctx context.Context, configPath string) (*appRuntime, error) {
 
 	return &appRuntime{
 		cfg:        cfg,
-		policies:   policies,
-		counter:    counter,
 		pageStore:  pageStore,
-		registry:   registry,
 		grpcServer: grpcServer,
 	}, nil
+}
+
+func loadConfig(path string) (*config.AppConfig, error) {
+	cfg, err := config.LoadAppConfig(path)
+	if err != nil {
+		return nil, err
+	}
+	if err := cfg.Validate(); err != nil {
+		return nil, err
+	}
+	return cfg, nil
 }
 
 func newPageStore(ctx context.Context, cfg *config.AppConfig) (*store.RedisStore, error) {
@@ -83,26 +82,6 @@ func newPageStore(ctx context.Context, cfg *config.AppConfig) (*store.RedisStore
 		return nil, fmt.Errorf("init redis store failed: %w", err)
 	}
 	return pageStore, nil
-}
-
-func buildRegistry(counter engine.TokenCounter, pageStore store.PageStore, summaryQueue store.SummaryJobQueue, pagingLimit int) *engine.Registry {
-	registry := engine.NewRegistry()
-	for _, item := range []engine.Processor{
-		processor.NewPagingProcessor(counter, pageStore, pagingLimit),
-		processor.NewCollapseProcessor(counter),
-		processor.NewCompactProcessor(counter),
-		processor.NewJSONTrimProcessor(counter),
-		processor.NewTableReduceProcessor(counter),
-		processor.NewCodeOutlineProcessor(counter),
-		processor.NewErrorStackFocusProcessor(counter),
-		processor.NewSnipProcessor(counter),
-		processor.NewAutoCompactSyncProcessor(counter),
-		processor.NewAutoCompactAsyncProcessor(counter, summaryQueue),
-		processor.NewAssembleProcessor(counter),
-	} {
-		registry.MustRegister(item)
-	}
-	return registry
 }
 
 func startSummaryWorker(ctx context.Context, runtime *appRuntime) {

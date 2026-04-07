@@ -20,13 +20,14 @@
 3. [docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
 4. [docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
 5. [cmd/main.go](/E:/github/Memory_chunk/cmd/main.go)
-6. [cmd/bootstrap.go](/E:/github/Memory_chunk/cmd/bootstrap.go)
-7. [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go)
-8. [internal/engine/pipeline.go](/E:/github/Memory_chunk/internal/engine/pipeline.go)
+6. [cmd/runtime.go](/E:/github/Memory_chunk/cmd/runtime.go)
+7. [cmd/registry.go](/E:/github/Memory_chunk/cmd/registry.go)
+8. [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go)
+9. [internal/engine/pipeline.go](/E:/github/Memory_chunk/internal/engine/pipeline.go)
 
 ## 3. 关键目录
 
-- [cmd](/E:/github/Memory_chunk/cmd)：程序入口与 bootstrap 组装
+- [cmd](/E:/github/Memory_chunk/cmd)：程序入口、runtime 组装与 registry 注册
 - [internal/config](/E:/github/Memory_chunk/internal/config)：配置与策略解析
 - [internal/engine](/E:/github/Memory_chunk/internal/engine)：领域模型、pipeline、registry
 - [internal/processor](/E:/github/Memory_chunk/internal/processor)：上下文治理动作
@@ -49,21 +50,21 @@
 ### 新增或调整处理器
 
 1. 在 [internal/processor](/E:/github/Memory_chunk/internal/processor) 新增或修改实现
-2. 在 [cmd/bootstrap.go](/E:/github/Memory_chunk/cmd/bootstrap.go) 的 `buildRegistry` 中注册
+2. 在 [cmd/registry.go](/E:/github/Memory_chunk/cmd/registry.go) 的 `buildRegistry` 中注册
 3. 在 [config/policies.yaml](/E:/github/Memory_chunk/config/policies.yaml) 中编排步骤
 4. 更新 [docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
 
 ### 调整协议映射
 
-1. 修改 [internal/server/mapping.go](/E:/github/Memory_chunk/internal/server/mapping.go)
+1. 修改 [internal/server/request_mapping.go](/E:/github/Memory_chunk/internal/server/request_mapping.go) 和 [internal/server/response_mapping.go](/E:/github/Memory_chunk/internal/server/response_mapping.go)
 2. 保持 [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go) 只负责 handler 主流程
 3. 检查响应字段与审计字段是否仍然自洽
 
 ### 调整启发式摘要或结构化提取规则
 
-1. 优先检查 [internal/heuristic/text.go](/E:/github/Memory_chunk/internal/heuristic/text.go)
+1. 优先检查 [internal/heuristic/json.go](/E:/github/Memory_chunk/internal/heuristic/json.go)、[internal/heuristic/extract.go](/E:/github/Memory_chunk/internal/heuristic/extract.go)、[internal/heuristic/lines.go](/E:/github/Memory_chunk/internal/heuristic/lines.go)
 2. 再看 [internal/processor/structured.go](/E:/github/Memory_chunk/internal/processor/structured.go)
-3. 再看 [internal/summary/render.go](/E:/github/Memory_chunk/internal/summary/render.go)
+3. 再看 [internal/summary/summarizer.go](/E:/github/Memory_chunk/internal/summary/summarizer.go)
 
 ## 6. 验证方式
 
