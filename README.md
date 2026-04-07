@@ -1,32 +1,80 @@
-# Memory_chunk
+# Context Refiner
 
 一个位于 AI 应用层与大模型 API 之间的 Go gRPC 上下文清洗服务。
 
-## 当前实现
+根目录这份 README 现在只承担一件事：
 
-- `Pipeline-Processor` 管线骨架
-- 真实 `tiktoken-go` Token 计数，输入与输出口径统一
-- 带能力声明的 Processor：`Aggressive / Lossy / StructuredInputOnly / MinTriggerTokens / PreserveCitation`
-- 结构化 RAG Chunk：支持 `title / body / code / table / json / tool-output / log / error-stack`
-- 真实 Redis PageStore，分页 key 含 `session_id + request_id + chunk_id + content_hash + page_index`
-- 双级 `auto_compact`
-- 同步级：安全压缩日志、工具输出、错误栈
-- 异步级：写入 Redis Stream 摘要任务，等待后续 page-in
-- 语义保真审计：记录删除/保留/原因/引用保留/代码围栏保留/错误栈保留
-- `refiner.proto` 与真实 gRPC 服务端
+`把你带到新的 docs 文档体系入口。`
 
-## 快速运行
+## 1. 从哪里开始
 
-1. 在 [service.yaml](E:\github\Memory_chunk\config\service.yaml) 填入 `grpc.listen_addr` 和 `redis.addr`
-2. 启动 Redis
-3. 运行：
+总入口：
 
-```powershell
-go run ./cmd
-```
+- [docs/README.md](/E:/github/Memory_chunk/docs/README.md)
 
-## 下一步
+如果你只想快速找到合适文档，可直接按用途进入：
 
-- 增加真实异步摘要消费者
-- 增加 Prometheus 指标与 Tracing
-- 增加集成测试与压缩效果评测
+- 项目定位与整体设计：[docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
+- 本地启动与最小调用：[docs/quickstart.md](/E:/github/Memory_chunk/docs/quickstart.md)
+- 代码结构与核心模块：[docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
+- AI / Agent 协作入口：[Agent.md](/E:/github/Memory_chunk/Agent.md)
+- 原理、取舍与边界：[docs/principles-and-internals.md](/E:/github/Memory_chunk/docs/principles-and-internals.md)
+- 当前进度：[docs/todolist.md](/E:/github/Memory_chunk/docs/todolist.md)
+- 后续路线：[docs/implementation-plan.md](/E:/github/Memory_chunk/docs/implementation-plan.md)
+- 测试补齐计划：[docs/test-plan.md](/E:/github/Memory_chunk/docs/test-plan.md)
+
+## 2. 当前项目状态
+
+当前仓库已经具备这些核心能力：
+
+- gRPC `Refine` / `PageIn` 主链
+- 基于 `tiktoken-go` 的统一 Token 计数
+- `Pipeline-Processor` 处理器注册与执行骨架
+- 结构化 `RAGFragment` 支持 `body / code / table / json / log / error-stack` 等类型
+- Redis page-out / page-in
+- summary job 入队、worker 消费与摘要回填
+- 语义审计字段与压缩过程记录
+
+但项目还没有进入“工程化完成”状态，当前主要缺口仍然是：
+
+- 测试
+- 观测
+- 真实摘要 Provider
+- 更稳定的摘要对象与失效策略
+
+这些内容在 [docs/todolist.md](/E:/github/Memory_chunk/docs/todolist.md) 和
+[docs/implementation-plan.md](/E:/github/Memory_chunk/docs/implementation-plan.md)
+里有更完整说明。
+
+## 3. 最短阅读路径
+
+如果你是第一次进入这个仓库，建议按这个顺序：
+
+1. [docs/README.md](/E:/github/Memory_chunk/docs/README.md)
+2. [docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
+3. [docs/quickstart.md](/E:/github/Memory_chunk/docs/quickstart.md)
+4. [docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
+5. [Agent.md](/E:/github/Memory_chunk/Agent.md)
+
+如果你是准备补测试或继续工程化，建议按这个顺序：
+
+1. [docs/todolist.md](/E:/github/Memory_chunk/docs/todolist.md)
+2. [docs/implementation-plan.md](/E:/github/Memory_chunk/docs/implementation-plan.md)
+3. [docs/test-plan.md](/E:/github/Memory_chunk/docs/test-plan.md)
+
+## 4. 仓库内主要目录
+
+- [api](/E:/github/Memory_chunk/api) gRPC 协议定义与生成代码入口
+- [cmd](/E:/github/Memory_chunk/cmd) 程序启动入口
+- [config](/E:/github/Memory_chunk/config) 服务配置与策略配置
+- [internal](/E:/github/Memory_chunk/internal) 核心实现，包括 engine、processor、server、store、summary 等模块
+- [docs](/E:/github/Memory_chunk/docs) 当前维护中的文档主目录
+
+## 5. 迁移说明
+
+如果你之前把根 README 当作唯一说明文档使用，现在需要改成：
+
+- 先看 [docs/README.md](/E:/github/Memory_chunk/docs/README.md)
+- 再按具体目标进入对应子文档
+
+这样做的目的，是避免继续把“概览、教程、参考、解释、计划、状态”混在一篇里。
