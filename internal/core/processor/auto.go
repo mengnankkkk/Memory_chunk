@@ -106,8 +106,9 @@ func (p *AutoCompactAsyncProcessor) Process(ctx context.Context, req *core.Refin
 		if p.counter.CountChunk(chunk) < threshold/2 {
 			continue
 		}
+		stableChunk := core.StableRAGChunks([]core.RAGChunk{chunk})[0]
 		fragments := make([]repository.SummaryFragment, 0, len(chunk.Fragments))
-		for _, fragment := range chunk.Fragments {
+		for _, fragment := range stableChunk.Fragments {
 			fragments = append(fragments, repository.SummaryFragment{
 				Type:     string(fragment.Type),
 				Content:  fragment.Content,
@@ -115,16 +116,16 @@ func (p *AutoCompactAsyncProcessor) Process(ctx context.Context, req *core.Refin
 			})
 		}
 		job := repository.SummaryJob{
-			JobID:         fmt.Sprintf("%s-%s", updated.RequestID, hashText(core.ChunkText(chunk))),
+			JobID:         fmt.Sprintf("summary-%s", hashText(core.ChunkText(stableChunk))),
 			SessionID:     updated.SessionID,
 			RequestID:     updated.RequestID,
 			Policy:        updated.Policy,
-			ChunkID:       chunk.ID,
-			Source:        strings.Join(joinSources(chunk), ","),
-			ContentHash:   hashText(core.ChunkText(chunk)),
-			PageRefs:      append([]string(nil), chunk.PageRefs...),
+			ChunkID:       stableChunk.ID,
+			Source:        strings.Join(joinSources(stableChunk), ","),
+			ContentHash:   hashText(core.ChunkText(stableChunk)),
+			PageRefs:      append([]string(nil), stableChunk.PageRefs...),
 			Fragments:     fragments,
-			Content:       core.ChunkText(chunk),
+			Content:       core.ChunkText(stableChunk),
 			TargetTokens:  updated.Budget,
 			CurrentTokens: updated.CurrentTokens,
 			CreatedAt:     time.Now().UTC(),

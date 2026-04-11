@@ -41,8 +41,11 @@ internal/
   core/
     repository/
     processor/
+  observability/
   infra/
     config/
+    observability/
+    tracing/
     store/
       redis/
     summary/
@@ -185,6 +188,7 @@ pkg/
 - [internal/core/processor/paging.go](/E:/github/Memory_chunk/internal/core/processor/paging.go)
 - [internal/core/processor/collapse.go](/E:/github/Memory_chunk/internal/core/processor/collapse.go)
 - [internal/core/processor/compact.go](/E:/github/Memory_chunk/internal/core/processor/compact.go)
+- [internal/core/processor/canonicalize.go](/E:/github/Memory_chunk/internal/core/processor/canonicalize.go)
 - [internal/core/processor/structured.go](/E:/github/Memory_chunk/internal/core/processor/structured.go)
 - [internal/core/processor/snip.go](/E:/github/Memory_chunk/internal/core/processor/snip.go)
 - [internal/core/processor/auto.go](/E:/github/Memory_chunk/internal/core/processor/auto.go)
@@ -201,12 +205,24 @@ pkg/
 
 - [internal/infra/config/config.go](/E:/github/Memory_chunk/internal/infra/config/config.go)
 - [internal/infra/config/policy.go](/E:/github/Memory_chunk/internal/infra/config/policy.go)
+- [internal/infra/observability/prometheus.go](/E:/github/Memory_chunk/internal/infra/observability/prometheus.go)
 - [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
 - [internal/infra/summary/worker.go](/E:/github/Memory_chunk/internal/infra/summary/worker.go)
 - [internal/infra/summary/summarizer.go](/E:/github/Memory_chunk/internal/infra/summary/summarizer.go)
 - [internal/infra/tokenizer/counter.go](/E:/github/Memory_chunk/internal/infra/tokenizer/counter.go)
 
-### 3.12 `internal/support/`
+### 3.12 `internal/observability/`
+
+职责：
+
+- 定义应用层可依赖的观测抽象
+- 让 service、store、worker 不直接依赖具体 metrics SDK
+
+关键文件：
+
+- [internal/observability/recorder.go](/E:/github/Memory_chunk/internal/observability/recorder.go)
+
+### 3.13 `internal/support/`
 
 职责：
 
@@ -333,6 +349,7 @@ type RefinerService interface {
 - `paging`：把超长 chunk 分页，保留第一页并把其余页写入 store
 - `collapse`：对重复 chunk 去重并尽量保留来源
 - `compact`：做安全微压缩，不主动改写语义
+- `canonicalize`：稳定化 `rag_chunks` 和 `sources` 的顺序，减少 prefix 抖动
 - `json_trim` / `table_reduce` / `code_outline` / `error_stack_focus`：按 fragment type 做结构感知处理
 - `snip`：对高密度长片段做 middle-out 截断
 - `auto_compact_sync`：同步低风险整理
@@ -356,7 +373,7 @@ type RefinerService interface {
 
 ### 8.2 Redis Store
 
-- page 内容用 page key 存储
+- page 内容优先按 content-addressed artifact key 存储
 - summary 结果优先回填
 - summary queue 基于 Redis Stream
 
@@ -383,6 +400,13 @@ type RefinerService interface {
 对应代码：
 
 - [internal/infra/tokenizer/counter.go](/E:/github/Memory_chunk/internal/infra/tokenizer/counter.go)
+
+### 8.5 Observability
+
+- `internal/observability` 定义 recorder contract
+- `internal/infra/observability` 提供 Prometheus 实现
+- runtime 会额外启动一个独立的 metrics HTTP server
+- 当前指标重点覆盖 `refine/pagein`、pipeline step、token、stable prefix、page reuse、summary job
 
 ## 9. 扩展指南
 
@@ -442,6 +466,7 @@ type RefinerService interface {
 - summary 仍是启发式逻辑，不是独立 provider 体系
 - repository 目前仍由一个 Redis 实现同时承载 page 与 summary queue
 - 观测、评测、测试覆盖还不完整
+- 当前应用层已做 cache-aware 稳定化，但 KV 容量 / 淘汰 / 量化仍依赖下游 serving engine
 
 ## 12. 结论
 

@@ -1,0 +1,50 @@
+services:
+  prometheus:
+    image: prom/prometheus:v3.4.2
+    container_name: context-refiner-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  tempo:
+    image: grafana/tempo:2.8.2
+    container_name: context-refiner-tempo
+    command:
+      - "-config.file=/etc/tempo.yaml"
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    container_name: context-refiner-otel-collector
+    command:
+      - "--config=/etc/otelcol/config.yaml"
+    ports:
+      - "4318:4318"
+      - "4317:4317"
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      - tempo
+
+  grafana:
+    image: grafana/grafana:12.0.2
+    container_name: context-refiner-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+      - tempo

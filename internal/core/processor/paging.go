@@ -47,9 +47,10 @@ func (p *PagingProcessor) Process(ctx context.Context, req *core.RefineRequest) 
 		}
 		pages := paginateChunk(p.counter, chunk, p.pageLimit)
 		pageRefs := make([]string, 0, len(pages))
-		chunkHash := hashText(core.ChunkText(chunk))
+		canonicalChunk := core.ChunkText(core.StableRAGChunks([]core.RAGChunk{chunk})[0])
+		chunkHash := hashText(canonicalChunk)
 		for idx, page := range pages {
-			key := scopedPageKey(updated.SessionID, updated.RequestID, chunk.ID, chunkHash, idx+1)
+			key := contentAddressedPageKey(chunk, chunkHash, idx+1)
 			if err := p.store.SavePage(ctx, key, core.FragmentsText(page)); err != nil {
 				return nil, core.ProcessResult{}, err
 			}
@@ -105,12 +106,14 @@ func paginateChunk(counter core.TokenCounter, chunk core.RAGChunk, pageLimit int
 	return pages
 }
 
-func scopedPageKey(sessionID, requestID, chunkID, contentHash string, pageIndex int) string {
+func contentAddressedPageKey(chunk core.RAGChunk, contentHash string, pageIndex int) string {
+	sourceKey := stableArtifactKeyParts(joinSources(chunk)...)
+	if sourceKey == "" {
+		sourceKey = "unknown"
+	}
 	return fmt.Sprintf(
-		"session:%s:request:%s:chunk:%s:hash:%s:page:%d",
-		sanitizeKeyPart(sessionID),
-		sanitizeKeyPart(requestID),
-		sanitizeKeyPart(chunkID),
+		"artifact:v1:rag:sources:%s:hash:%s:page:%d",
+		sourceKey,
 		contentHash,
 		pageIndex,
 	)

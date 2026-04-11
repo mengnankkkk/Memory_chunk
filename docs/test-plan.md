@@ -166,6 +166,8 @@ gRPC 服务集成测试重点：
 - 压缩前后 token 是否单调下降或至少不失控增长
 - `code fence`、错误栈、来源信息是否按能力声明保留
 - 结构化 fragment 在不同处理器下是否保持合理输出
+- `canonicalize` 后 `sources` 与 `rag_chunks` 顺序是否稳定
+- 同内容不同 `request_id/session_id` 下 page key 是否保持一致
 
 这里不要只测“函数能跑”，还要测：
 
@@ -182,6 +184,7 @@ gRPC 服务集成测试重点：
 - summary 保存后 `LoadResolvedPage` 优先返回 summary
 - 原始 page 不存在时返回明确错误
 - Stream 中 payload 缺失或不合法时行为是否可接受
+- 相同内容跨请求生成的 artifact key 是否相同
 
 ### 6.5 Worker 逻辑
 
@@ -308,7 +311,7 @@ docker run --name context-refiner-redis-test -p 6379:6379 -d redis:7
 1. 先补 `internal/service/request_mapping.go` 与 `response_mapping.go`
 2. 再补 `internal/infra/summary/summarizer.go` 中的摘要逻辑
 3. 再补 `internal/infra/config/config.go` 与 `policy.go`
-4. 然后补 `internal/infra/store/redis/repository.go`
+4. 然后补 `internal/infra/store/redis/repository.go` 与 content-addressed key 相关测试
 5. 再补 `Refine` / `PageIn` 服务集成测试
 6. 最后补最小冒烟测试脚本或手工验证步骤
 

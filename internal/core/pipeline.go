@@ -3,8 +3,13 @@ package core
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	otelcodes "go.opentelemetry.io/otel/codes"
 )
 
 type FragmentType string
@@ -155,8 +160,14 @@ func NewPipeline(processors []Processor, counter TokenCounter) *Pipeline {
 }
 
 func (p *Pipeline) Run(ctx context.Context, req *RefineRequest) (*RefineResponse, error) {
+	ctx, span := otel.Tracer("context-refiner/core/pipeline").Start(ctx, "pipeline.run")
+	defer span.End()
+
 	if req == nil {
-		return nil, fmt.Errorf("nil request")
+		err := fmt.Errorf("nil request")
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, err.Error())
+		return nil, err
 	}
 	if req.Metadata == nil {
 		req.Metadata = make(map[string]string)
@@ -165,22 +176,44 @@ func (p *Pipeline) Run(ctx context.Context, req *RefineRequest) (*RefineResponse
 		req.CurrentTokens = p.counter.CountRequest(req)
 	}
 	req.InputTokens = req.CurrentTokens
+	span.SetAttributes(
+		attribute.String("pipeline.policy", req.RuntimePolicy.Name),
+		attribute.Int("pipeline.budget", req.Budget),
+		attribute.Int("pipeline.initial_tokens", req.InputTokens),
+		attribute.Int("pipeline.processor_count", len(p.processors)),
+	)
 
 	for _, processor := range p.processors {
 		descriptor := processor.Descriptor()
 		if shouldSkipProcessor(req, descriptor) {
+			span.AddEvent("processor_skipped")
 			continue
 		}
 
 		before := req.CurrentTokens
 		start := time.Now()
+		stepCtx, stepSpan := otel.Tracer("context-refiner/core/pipeline").Start(ctx, "pipeline."+descriptor.Name)
+		stepSpan.SetAttributes(
+			attribute.String("processor.name", descriptor.Name),
+			attribute.Int("processor.before_tokens", before),
+		)
 
-		nextReq, result, err := processor.Process(ctx, req)
+		nextReq, result, err := processor.Process(stepCtx, req)
 		if err != nil {
-			return nil, fmt.Errorf("processor %s failed: %w", descriptor.Name, err)
+			stepSpan.RecordError(err)
+			stepSpan.SetStatus(otelcodes.Error, err.Error())
+			stepSpan.End()
+			err = fmt.Errorf("processor %s failed: %w", descriptor.Name, err)
+			span.RecordError(err)
+			span.SetStatus(otelcodes.Error, err.Error())
+			return nil, err
 		}
 		if nextReq == nil {
-			return nil, fmt.Errorf("processor %s returned nil request", descriptor.Name)
+			stepSpan.End()
+			err := fmt.Errorf("processor %s returned nil request", descriptor.Name)
+			span.RecordError(err)
+			span.SetStatus(otelcodes.Error, err.Error())
+			return nil, err
 		}
 		if nextReq.Metadata == nil {
 			nextReq.Metadata = req.Metadata
@@ -188,6 +221,11 @@ func (p *Pipeline) Run(ctx context.Context, req *RefineRequest) (*RefineResponse
 		if nextReq.CurrentTokens == 0 {
 			nextReq.CurrentTokens = p.counter.CountRequest(nextReq)
 		}
+		stepSpan.SetAttributes(
+			attribute.Int("processor.after_tokens", nextReq.CurrentTokens),
+			attribute.Int64("processor.duration_ms", time.Since(start).Milliseconds()),
+		)
+		stepSpan.End()
 
 		nextReq.Audits = append(nextReq.Audits, StepAudit{
 			Name:         descriptor.Name,
@@ -205,6 +243,10 @@ func (p *Pipeline) Run(ctx context.Context, req *RefineRequest) (*RefineResponse
 		req.OptimizedPrompt = AssemblePrompt(req)
 		req.CurrentTokens = p.counter.CountText(req.OptimizedPrompt)
 	}
+	span.SetAttributes(
+		attribute.Int("pipeline.final_tokens", req.CurrentTokens),
+		attribute.Bool("pipeline.budget_met", req.CurrentTokens <= req.Budget),
+	)
 
 	return &RefineResponse{
 		OptimizedPrompt:      req.OptimizedPrompt,
@@ -259,25 +301,146 @@ func extractPagedChunks(req *RefineRequest) []PagedChunk {
 
 func AssemblePrompt(req *RefineRequest) string {
 	var builder strings.Builder
-	builder.WriteString("# Messages\n")
-	for _, msg := range req.Messages {
-		builder.WriteString(fmt.Sprintf("[%s]\n%s\n\n", strings.ToUpper(msg.Role), strings.TrimSpace(msg.Content)))
+	stableChunks := StableRAGChunks(req.RAGChunks)
+	stableMessages, dynamicMessages := StablePromptMessages(req.Messages)
+	if len(stableChunks) > 0 {
+		builder.WriteString("# Stable Context\n")
+		builder.WriteString("## RAG\n")
+		for _, chunk := range stableChunks {
+			builder.WriteString(renderChunk(chunk))
+		}
+		builder.WriteString("\n")
 	}
-	if len(req.RAGChunks) > 0 {
-		builder.WriteString("# RAG\n")
-		for _, chunk := range req.RAGChunks {
-			sources := chunk.Sources
-			if len(sources) == 0 && strings.TrimSpace(chunk.Source) != "" {
-				sources = []string{chunk.Source}
-			}
-			sourceLabel := strings.Join(sources, ", ")
-			if sourceLabel == "" {
-				sourceLabel = "unknown"
-			}
-			builder.WriteString(fmt.Sprintf("- (%s)\n%s\n", sourceLabel, strings.TrimSpace(ChunkText(chunk))))
+	if len(stableMessages) > 0 {
+		builder.WriteString("# Conversation Memory\n")
+		for _, msg := range stableMessages {
+			builder.WriteString(renderMessage(msg))
+		}
+		builder.WriteString("\n")
+	}
+	if len(dynamicMessages) > 0 {
+		builder.WriteString("# Active Turn\n")
+		for _, msg := range dynamicMessages {
+			builder.WriteString(renderMessage(msg))
 		}
 	}
 	return strings.TrimSpace(builder.String())
+}
+
+func StableRAGChunks(chunks []RAGChunk) []RAGChunk {
+	stable := make([]RAGChunk, 0, len(chunks))
+	for _, chunk := range chunks {
+		next := chunk
+		next.Source = NormalizeSourceLabel(chunk.Source)
+		next.Sources = StableSources(chunk.Sources, chunk.Source)
+		next.Fragments = NormalizeFragments(chunk.Fragments)
+		next.PageRefs = normalizePageRefs(chunk.PageRefs)
+		stable = append(stable, next)
+	}
+	sort.SliceStable(stable, func(i, j int) bool {
+		left := stableChunkSortKey(stable[i])
+		right := stableChunkSortKey(stable[j])
+		if left == right {
+			return stableChunkTieKey(stable[i]) < stableChunkTieKey(stable[j])
+		}
+		return left < right
+	})
+	return stable
+}
+
+func StablePromptMessages(messages []Message) ([]Message, []Message) {
+	systemMessages, memoryMessages, activeMessages := StablePromptSegments(messages)
+	return append(systemMessages, memoryMessages...), activeMessages
+}
+
+func StablePromptSegments(messages []Message) ([]Message, []Message, []Message) {
+	if len(messages) == 0 {
+		return nil, nil, nil
+	}
+	normalized := make([]Message, 0, len(messages))
+	for _, message := range messages {
+		segment := "memory"
+		if normalizeRole(message.Role) == "system" {
+			segment = "system"
+		}
+		normalized = append(normalized, Message{
+			Role:    normalizeRole(message.Role),
+			Content: NormalizeTextContent(message.Content, segment),
+		})
+	}
+	if len(normalized) == 1 {
+		normalized[0].Content = NormalizeTextContent(messages[0].Content, "active_turn")
+		return nil, nil, append([]Message(nil), normalized[0])
+	}
+
+	active := append([]Message(nil), normalized[len(normalized)-1])
+	active[0].Content = NormalizeTextContent(messages[len(messages)-1].Content, "active_turn")
+	stable := normalized[:len(normalized)-1]
+	systemMessages := make([]Message, 0)
+	memoryMessages := make([]Message, 0)
+	for _, message := range stable {
+		if message.Role == "system" {
+			systemMessages = append(systemMessages, message)
+			continue
+		}
+		memoryMessages = append(memoryMessages, message)
+	}
+	return systemMessages, memoryMessages, active
+}
+
+func StableSources(values []string, fallback string) []string {
+	candidates := append([]string(nil), values...)
+	if len(candidates) == 0 && strings.TrimSpace(fallback) != "" {
+		candidates = append(candidates, fallback)
+	}
+	seen := make(map[string]string)
+	for _, value := range candidates {
+		normalized := NormalizeSourceLabel(value)
+		if normalized == "" {
+			continue
+		}
+		key := strings.ToLower(normalized)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = normalized
+	}
+	out := make([]string, 0, len(seen))
+	for _, value := range seen {
+		out = append(out, value)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return strings.ToLower(out[i]) < strings.ToLower(out[j])
+	})
+	return out
+}
+
+func renderChunk(chunk RAGChunk) string {
+	sourceLabel := strings.Join(chunk.Sources, ", ")
+	if sourceLabel == "" {
+		sourceLabel = "unknown"
+	}
+	return fmt.Sprintf("- (%s)\n%s\n", sourceLabel, strings.TrimSpace(ChunkText(chunk)))
+}
+
+func renderMessage(msg Message) string {
+	return fmt.Sprintf("[%s]\n%s\n\n", strings.ToUpper(strings.TrimSpace(msg.Role)), strings.TrimSpace(msg.Content))
+}
+
+func stableChunkSortKey(chunk RAGChunk) string {
+	sourceLabel := strings.Join(chunk.Sources, ",")
+	if sourceLabel == "" {
+		sourceLabel = strings.TrimSpace(chunk.Source)
+	}
+	return strings.ToLower(sourceLabel)
+}
+
+func stableChunkTieKey(chunk RAGChunk) string {
+	id := strings.TrimSpace(chunk.ID)
+	if id == "" {
+		id = ChunkText(chunk)
+	}
+	return strings.ToLower(id)
 }
 
 func ChunkText(chunk RAGChunk) string {

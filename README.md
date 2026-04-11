@@ -37,11 +37,16 @@
 - Redis page-out / page-in
 - summary job 入队、worker 消费与摘要回填
 - 语义审计字段与压缩过程记录
+- 应用层 stable prefix 规范化与分层 prefix hash
+- 应用层 prefix cache 策略
+  说明：`admission`、`namespace`、`TTL 分层`、`hot prefix`、`prewarm`
+- 应用层 prefix cache miss reason 观测与 tracing
 
 但项目还没有进入“工程化完成”状态，当前主要缺口仍然是：
 
 - 测试
-- 观测
+- Explain / dry-run / cache debug
+- 评测 / replay / alerting
 - 真实摘要 Provider
 - 更稳定的摘要对象与失效策略
 

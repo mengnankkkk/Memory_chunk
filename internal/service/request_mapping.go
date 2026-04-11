@@ -22,9 +22,13 @@ func mapRequest(req *refinerv1.RefineRequest, policy core.RuntimePolicy) *core.R
 		Policy:        firstNonEmpty(req.GetPolicy(), policy.Name),
 		RuntimePolicy: policy,
 		Metadata: map[string]string{
-			"policy":     policy.Name,
-			"session_id": sessionID,
-			"request_id": requestID,
+			"policy":                    policy.Name,
+			"session_id":                sessionID,
+			"request_id":                requestID,
+			"prompt_layout_version":     "stable-prefix-v2",
+			"normalization_version":     "stable-prefix-v2",
+			"artifact_key_version":      "content-addressed-v1",
+			"cache_optimization_target": "prefix-hit-rate",
 		},
 	}
 }
@@ -46,11 +50,11 @@ func mapChunks(req *refinerv1.RefineRequest) []core.RAGChunk {
 		chunks = append(chunks, core.RAGChunk{
 			ID:        item.GetId(),
 			Source:    item.GetSource(),
-			Sources:   mapSources(item),
+			Sources:   core.StableSources(mapSources(item), item.GetSource()),
 			Fragments: mapFragments(item),
 		})
 	}
-	return chunks
+	return core.StableRAGChunks(chunks)
 }
 
 func mapSources(chunk *refinerv1.RagChunk) []string {

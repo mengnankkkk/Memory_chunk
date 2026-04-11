@@ -49,6 +49,7 @@
 - 支持可解释审计，避免做了 lossy 压缩却无法追责
 - 支持分页与异步摘要，为后续缓存复用和重型压缩能力打底
 - 保留演进空间，让后续摘要 Provider、观测能力、缓存能力可以插入
+- 尽可能把稳定上下文前置，提升下游 prefix / KV cache 命中率
 
 ## 4. 非目标
 
@@ -88,7 +89,7 @@ Core Pipeline
     |
     +--> Audit Output
     |
-    +--> Infra Store / Summary Queue / Tokenizer
+    +--> Infra Store / Summary Queue / Tokenizer / Observability
     |
     `--> PageIn / Summary Fallback
 ```
@@ -152,12 +153,14 @@ Core Pipeline
 - 每个 Processor 只做单一职责的清洗/压缩动作
 - 避免把复杂规则塞回引擎
 - 形成稳定的扩展点
+- 在应用层尽可能把输入稳定化，减少 prompt 形态抖动
 
 当前已实现的 Processor：
 
 - `paging`
 - `collapse`
 - `compact`
+- `canonicalize`
 - `json_trim`
 - `table_reduce`
 - `code_outline`
@@ -175,12 +178,15 @@ Core Pipeline
 - 摘要结果存 Redis
 - 异步摘要任务写入 Redis Stream
 - worker 通过 consumer group 消费任务
+- page / summary 尽量基于 content-addressed artifact key 复用
 
 当前实现：
 
 - [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go)
+- [internal/observability/recorder.go](/E:/github/Memory_chunk/internal/observability/recorder.go)
 - [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
 - [internal/infra/summary/worker.go](/E:/github/Memory_chunk/internal/infra/summary/worker.go)
+- [internal/infra/observability/prometheus.go](/E:/github/Memory_chunk/internal/infra/observability/prometheus.go)
 
 ### 6.6 Egress 层
 
@@ -254,6 +260,7 @@ RefineRequest
   -> build pipeline
   -> count input tokens
   -> run processors in order
+  -> canonicalize stable rag ordering / sources
   -> assemble prompt
   -> mapResponse
   -> RefineResponse
@@ -265,7 +272,7 @@ RefineRequest
 large chunk
   -> paging processor
   -> split by token
-  -> save pages to Redis
+  -> save pages to Redis with content-addressed artifact key
   -> keep first page in prompt
   -> expose page_refs
   -> PageIn loads page or summary
@@ -279,9 +286,117 @@ large chunk after sync compaction
   -> enqueue SummaryJob to Redis Stream
   -> worker consume job
   -> heuristic summarize
-  -> save summary to Redis summary key
+  -> save summary to Redis summary key for shared page refs
   -> PageIn prefers summary result
 ```
+
+## 8.4 面向 KV Cache 的 Prompt 设计
+
+当前实现已经把 prompt 组装改成“稳定块优先、动态块后置”：
+
+```text
+# Stable Context
+## RAG
+  ... 稳定排序后的 RAG chunks
+
+# Conversation Memory
+  ... 历史消息
+
+# Active Turn
+  ... 当前最新一轮消息
+```
+
+这样做的目标不是改变业务语义，而是让：
+
+- 更长、更贵、更稳定的上下文尽量位于公共前缀
+- 最新用户输入落在 suffix，减少对共享前缀的破坏
+- RAG source 与 chunk 顺序可预测，降低检索抖动带来的 cache miss
+
+## 8.5 应用层 Prefix Cache 策略
+
+在 8.4 的稳定前缀布局之上，当前代码已经继续做了应用层 prefix cache 的第二阶段改造。
+
+这里要刻意说清边界：
+
+- 它不是模型 serving 层 KV block 复用
+- 它不是 GPU/CPU/SSD 多级 KV 管理
+- 它做的是应用层 prompt 稳定化、prefix 身份登记、命中诊断与策略控制
+
+当前已完成的能力可以拆成四层：
+
+### A. 规范化增强
+
+- 清洗时间戳、UUID、长 hex id、request/session/trace 等高抖动字段
+- 对 `system / memory / rag` 做分段稳定化
+- 对 JSON 做稳定化并剔除 volatile keys
+- 对 source、fragment、page refs 做去抖与稳定排序
+
+### B. 分层 Prefix 身份
+
+当前不仅记录一个总前缀，而是同时记录：
+
+- `combined_prefix_hash`
+- `system_prefix_hash`
+- `memory_prefix_hash`
+- `rag_prefix_hash`
+
+并记录各段 token 数，用于判断到底是哪一段在破坏稳定前缀。
+
+### C. Miss Reason 诊断
+
+当前已经能区分：
+
+- `empty`
+- `short_prefix`
+- `low_value_prefix`
+- `ttl_expired`
+- `hash_changed`
+- `model_changed`
+
+如果是 `hash_changed`，还会继续细分：
+
+- `system_changed`
+- `memory_changed`
+- `rag_changed`
+- `normalization_changed`
+- `combined_changed`
+
+### D. 应用层 Cache 策略
+
+当前已实现：
+
+- `admission policy`
+- `namespace`
+- `TTL 分层`
+- `热点前缀统计`
+- `prewarm`
+
+具体行为是：
+
+- 过短前缀会因 `min_stable_prefix_tokens` 被跳过
+- 低价值前缀会因 `min_segment_count` 被跳过
+- namespace 按 `tenant / policy / model` 组合，避免不同流量池互相污染
+- 默认 TTL 使用 `redis.prefix_cache_ttl`
+- 命中次数达到 `prefix_cache.hot_threshold` 后切到 `prefix_cache.hot_ttl`
+- 热点统计按 namespace 维度记录，而不是全局混用
+- `prewarm` 在服务启动时根据配置写入 prefix registry，不新增对外 API
+
+## 8.6 当前观测边界
+
+当前 Prometheus 与 tracing 已经能观测：
+
+- prefix lookup 是 `hit / created / skipped`
+- miss reason 是什么
+- stable prefix token 规模是多少
+- 当前 prefix 是否进入 `hot` 档
+- 当前 TTL tier 是 `default` 还是 `hot`
+
+但这些指标表达的是：
+
+- 应用层 prefix cache 是否更容易被复用
+- 应用层稳定前缀是否足够长、足够稳定
+
+它们不等于推理引擎真实 KV block 命中。
 
 ## 9. 当前真实阶段判断
 
@@ -293,9 +408,9 @@ large chunk after sync compaction
 
 - Phase 1 核心底盘：大体完成
 - Phase 2 摘要产品化：只做到了启发式闭环，未接真实外部模型
-- Phase 3 观测评测：基本未开始
+- Phase 3 观测评测：已完成 Prometheus 指标、OTel tracing 与 Grafana dashboard 基线接入
 - Phase 4 结构化策略深化：已开头，尚未做深
-- Phase 5 缓存复用：未开始
+- Phase 5 应用层缓存复用：A/B/C/D 已完成，E/F 尚未完成
 
 ## 10. 当前约束与缺口
 
@@ -305,7 +420,11 @@ large chunk after sync compaction
 - `summary worker` 仍然是启发式摘要
 - 回填结果当前更接近 page 级摘要，而不是 chunk 级摘要对象
 - 自动化测试仍然不足，目前只有少量单测起步
-- 没有 Prometheus / Tracing / 回归评测工具
+- 已有 Prometheus Metrics
+- 已有应用层 Tracing 与 Dashboard
+- 没有回归评测工具
+- 当前还没有 `dry_run / explain / cache debug`
+- 当前还没有 replay 驱动的 prefix churn / hit ratio 离线评测
 
 ### 10.2 这意味着什么
 
@@ -318,17 +437,17 @@ large chunk after sync compaction
 
 当前最值得推进的三条主线是：
 
-1. 摘要 Provider 抽象
-2. 观测与评测闭环
+1. 应用层 KV 的 Explain / 观测 / 评测闭环
+2. 摘要 Provider 抽象
 3. 更细粒度的结构化治理
 
 推荐顺序：
 
-1. 先补指标和集成测试
-2. 再抽象 Summary Provider
-3. 再接真实外部摘要模型
-4. 再把摘要从 page 级字符串提升成 chunk 级结构化对象
-5. 最后再推进缓存复用和高级处理器
+1. 先补 `dry_run / explain / cache debug / normalized preview`
+2. 再补 replay、dashboard、alerting 与 prefix churn 分析
+3. 再抽象 Summary Provider
+4. 再接真实外部摘要模型
+5. 再把摘要从 page 级字符串提升成 chunk 级结构化对象
 
 ## 12. 结论
 

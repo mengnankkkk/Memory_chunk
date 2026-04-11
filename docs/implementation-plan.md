@@ -1,7 +1,7 @@
 # Context Refiner 实施计划与路线图
 
-- 文档版本：`v2026.04.06`
-- 更新日期：`2026-04-06`
+- 文档版本：`v2026.04.11`
+- 更新日期：`2026-04-11`
 - 文档类型：`Roadmap / Plan`
 - 适用代码基线：`main` 分支当前实现
 
@@ -65,7 +65,7 @@
 
 当前问题：
 
-- 没有 Prometheus 指标
+- Prometheus 指标已接入，但还缺 tracing 与系统化评测
 - 没有 Trace
 - 没有标准评测样本
 - 没有回归度量
@@ -146,12 +146,17 @@ type SummaryProvider interface {
 
 ### 第一批指标
 
-- `refiner_input_tokens_total`
-- `refiner_output_tokens_total`
-- `refiner_step_latency_seconds`
-- `refiner_pageout_total`
-- `refiner_summary_jobs_total`
-- `refiner_budget_met_total`
+- `context_refiner_refine_requests_total`
+- `context_refiner_refine_duration_seconds`
+- `context_refiner_pagein_requests_total`
+- `context_refiner_pagein_duration_seconds`
+- `context_refiner_tokens_total`
+- `context_refiner_prompt_segments_total`
+- `context_refiner_pipeline_step_duration_seconds`
+- `context_refiner_pipeline_step_tokens_total`
+- `context_refiner_page_artifact_writes_total`
+- `context_refiner_store_page_loads_total`
+- `context_refiner_summary_jobs_total`
 
 ### 第一批 Trace 观察点
 
@@ -197,12 +202,20 @@ type SummaryProvider interface {
 
 把单次请求压缩，升级成跨请求可复用的上下文治理。
 
+### 当前已完成的第一步
+
+- prompt 改成 `stable context -> conversation memory -> active turn`
+- 新增 `canonicalize`，稳定 `RAGChunk / sources` 顺序
+- page key 改成 content-addressed artifact key
+- summary job 与 page refs 开始围绕共享 artifact 工作
+
 ### 关键方向
 
 - 基于 `content_hash` 的跨请求复用
 - page 级 / chunk 级 / session 级摘要层次
 - 热点上下文缓存
 - 版本和失效策略
+- prefix hit rate / cached artifact reuse 指标
 
 ## 5. 推荐执行顺序
 
@@ -210,16 +223,16 @@ type SummaryProvider interface {
 
 1. 补最小本地运行方案
 2. 补单测与集成测试
-3. 补 Prometheus 指标
+3. 补 Tracing
 4. 抽象 Summary Provider
 5. 接真实外部摘要模型
 6. 升级 Summary Artifact
-7. 补 Tracing
+7. 增加 metrics dashboard 与告警
 8. 增加离线评测工具
 9. 增加 `log_dedup`
 10. 增加 `tool_output_focus`
 11. 增加 `rag_rerank_trim`
-12. 推进跨请求缓存复用
+12. 推进更深层的跨请求缓存复用
 
 ## 6. 最近两轮迭代建议
 

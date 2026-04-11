@@ -22,6 +22,45 @@ type SummaryJobConsumer interface {
 	AckSummaryJob(ctx context.Context, group string, messageID string) error
 }
 
+type PrefixCacheRepository interface {
+	RegisterPrefix(ctx context.Context, entry PrefixCacheEntry) (PrefixCacheRegistration, error)
+}
+
+type PrefixCacheEntry struct {
+	Key                  string    `json:"key"`
+	SessionScope         string    `json:"-"`
+	Namespace            string    `json:"namespace"`
+	ModelID              string    `json:"model_id"`
+	PrefixHash           string    `json:"prefix_hash"`
+	SystemPrefixHash     string    `json:"system_prefix_hash"`
+	MemoryPrefixHash     string    `json:"memory_prefix_hash"`
+	RAGPrefixHash        string    `json:"rag_prefix_hash"`
+	StablePrefixTokens   int       `json:"stable_prefix_tokens"`
+	SystemPrefixTokens   int       `json:"system_prefix_tokens"`
+	MemoryPrefixTokens   int       `json:"memory_prefix_tokens"`
+	RAGPrefixTokens      int       `json:"rag_prefix_tokens"`
+	PromptLayoutVersion  string    `json:"prompt_layout_version"`
+	ArtifactKeyVersion   string    `json:"artifact_key_version"`
+	CacheOptimizationAim string    `json:"cache_optimization_aim"`
+	NormalizationVersion string    `json:"normalization_version"`
+	CacheTier            string    `json:"cache_tier"`
+	AdmissionDecision    string    `json:"admission_decision"`
+	AppliedTTLSeconds    int64     `json:"applied_ttl_seconds"`
+	Hot                  bool      `json:"hot"`
+	HotScore             float64   `json:"hot_score"`
+	CreatedAt            time.Time `json:"created_at"`
+	LastSeenAt           time.Time `json:"last_seen_at"`
+	HitCount             int64     `json:"hit_count"`
+}
+
+type PrefixCacheRegistration struct {
+	Entry         PrefixCacheEntry
+	PreviousEntry PrefixCacheEntry
+	Result        string
+	MissReason    string
+	SegmentReason string
+}
+
 type SummaryFragment struct {
 	Type     string `json:"type"`
 	Content  string `json:"content"`

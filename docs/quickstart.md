@@ -1,7 +1,7 @@
 # Context Refiner 快速使用教程
 
-- 文档版本：`v2026.04.06`
-- 更新日期：`2026-04-06`
+- 文档版本：`v2026.04.11`
+- 更新日期：`2026-04-11`
 - 文档类型：`How-To / Quickstart`
 - 适用代码基线：`main` 分支当前实现
 
@@ -31,6 +31,16 @@
 grpc:
   listen_addr: "127.0.0.1:50051"
 
+observability:
+  metrics_enabled: true
+  metrics_listen_addr: ":9091"
+  metrics_path: "/metrics"
+  tracing_enabled: true
+  service_name: "context-refiner"
+  tracing_endpoint: "localhost:4318"
+  tracing_insecure: true
+  tracing_sample_rate: 1.0
+
 redis:
   addr: "127.0.0.1:6379"
   username: ""
@@ -38,6 +48,7 @@ redis:
   db: 0
   key_prefix: "context-refiner:page"
   page_ttl: "24h"
+  prefix_cache_ttl: "24h"
   summary_stream: "context-refiner:summary-jobs"
 
 tokenizer:
@@ -48,6 +59,18 @@ pipeline:
   policy_file: "config/policies.yaml"
   default_policy: "strict_coding_assistant"
   paging_token_threshold: 320
+
+prefix_cache:
+  min_stable_prefix_tokens: 32
+  min_segment_count: 1
+  default_tenant: "global"
+  hot_threshold: 5
+  hot_ttl: "72h"
+  namespace:
+    include_policy: true
+    include_model: true
+    include_tenant: true
+  prewarm: []
 
 summary_worker:
   enabled: true
@@ -79,7 +102,94 @@ go run ./cmd/refiner
 
 ```text
 refiner gRPC server listening on 127.0.0.1:50051
+metrics HTTP server listening on :9091/metrics
 ```
+
+## 5.1 查看指标
+
+当前已经内置 Prometheus 指标暴露，并支持 OTel tracing 上报。
+
+启动服务后可直接访问：
+
+```text
+http://127.0.0.1:9091/metrics
+```
+
+你可以看到这类指标：
+
+- `context_refiner_refine_requests_total`
+- `context_refiner_refine_duration_seconds`
+- `context_refiner_tokens_total`
+- `context_refiner_prompt_segments_total`
+- `context_refiner_pipeline_step_duration_seconds`
+- `context_refiner_prefix_cache_lookups_total`
+- `context_refiner_prefix_cache_tokens_total`
+- `context_refiner_page_artifact_writes_total`
+- `context_refiner_store_page_loads_total`
+- `context_refiner_summary_jobs_total`
+
+其中与应用层 prefix cache 直接相关的重点是：
+
+- `context_refiner_prefix_cache_lookups_total{result, miss_reason}`
+- `context_refiner_prefix_cache_tokens_total{kind="stable_prefix"}`
+
+这两类指标表达的是：
+
+- 应用层稳定前缀是否命中本地 prefix registry
+- 没命中时的原因是什么
+- 当前观察到的 stable prefix token 规模是多少
+
+它们不代表推理引擎内部真实 KV block 是否命中。
+
+## 5.2 Prefix Cache 配置说明
+
+当前仓库已经支持应用层 prefix cache 策略，重点配置都在 `prefix_cache` 段。
+
+### `min_stable_prefix_tokens`
+
+- 小于这个 token 数的稳定前缀会被直接跳过
+- 对应 miss reason 常见为 `short_prefix`
+
+### `min_segment_count`
+
+- 当前 stable prefix 被拆成 `system / memory / rag` 三段
+- 少于这个段数时会被视为低价值前缀并跳过
+- 对应 miss reason 常见为 `low_value_prefix`
+
+### `default_tenant` 与 `namespace`
+
+- 当前 proto 里没有单独的 `tenant` 字段
+- tenant 只会从请求内部 metadata 的 `tenant` 或 `tenant_id` 读取
+- 如果没有提供，就会回落到 `default_tenant`
+- namespace 由 `tenant / policy / model` 组合生成，是否包含三者由 `include_*` 开关决定
+
+这一步的目标是把不同租户、不同策略、不同模型的稳定前缀隔离开，避免应用层复用串桶。
+
+### `hot_threshold` 与 `hot_ttl`
+
+- prefix 首次写入走默认 `redis.prefix_cache_ttl`
+- 当同一 namespace 下某个 prefix 的命中次数达到 `hot_threshold` 后，会切到 `hot_ttl`
+- 当前只有 `default` 和 `hot` 两档 TTL，不是更复杂的 workload-aware eviction
+
+### `prewarm`
+
+- `prewarm` 不是新 API，而是启动时按配置预写 prefix registry
+- 适合固定 system prompt、固定 memory prompt、固定模板 RAG 前缀
+- 每一项支持：
+
+```yaml
+prefix_cache:
+  prewarm:
+    - name: "strict-coding-system"
+      model_id: "gpt-4o-mini"
+      policy: "strict_coding_assistant"
+      tenant: "global"
+      system_prompt: "You are a coding assistant."
+      memory_prompt: ""
+      rag_prompt: ""
+```
+
+服务启动后会把这些段拼成稳定前缀，先写入本地 prefix registry，后续相同 namespace 下的请求更容易直接命中。
 
 ## 6. 最小调用方式
 
@@ -133,7 +243,7 @@ grpcurl -plaintext -import-path . -proto api/refiner.proto -d "{
 ```powershell
 grpcurl -plaintext -import-path . -proto api/refiner.proto -d "{
   \"page_keys\": [
-    \"session:demo-session:request:demo-request:chunk:chunk-1:hash:abcdef123456:page:2\"
+    \"artifact:v1:rag:sources:doc-1:hash:abcdef123456:page:2\"
   ]
 }" 127.0.0.1:50051 refiner.v1.RefinerService/PageIn
 ```
@@ -185,7 +295,10 @@ grpcurl -plaintext -import-path . -proto api/refiner.proto -d "{
 - 默认配置不会直接启动成功
 - 当前 summary 仍是启发式摘要，不是外部模型摘要
 - 当前没有官方提供的 demo client
-- 当前没有 docker-compose 或一键启动脚本
+- 当前虽然已有 `deploy/observability/docker-compose.yaml`，但应用本身仍需手动启动
+- 当前 tracing 只覆盖应用层 prefix / pipeline / store / worker，不等于下游推理引擎真实 KV block 命中
+- 当前 prefix cache 是“应用层稳定前缀登记与复用提示”，不是模型 serving 层 KV block 管理
+- 当前没有 `dry_run / explain / cache debug` 对外接口，这部分仍在待办中
 
 ## 9. 建议的最小验证顺序
 

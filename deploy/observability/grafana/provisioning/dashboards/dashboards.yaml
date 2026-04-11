@@ -1,0 +1,10 @@
+apiVersion: 1
+
+providers:
+  - name: context-refiner
+    folder: Context Refiner
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards

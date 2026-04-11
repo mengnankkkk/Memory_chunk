@@ -3,6 +3,7 @@ package processor
 import (
 	"crypto/sha256"
 	"fmt"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -33,13 +34,7 @@ func preserveFlags(chunk core.RAGChunk) (bool, bool) {
 }
 
 func joinSources(chunk core.RAGChunk) []string {
-	if len(chunk.Sources) > 0 {
-		return append([]string(nil), chunk.Sources...)
-	}
-	if strings.TrimSpace(chunk.Source) != "" {
-		return []string{chunk.Source}
-	}
-	return nil
+	return core.StableSources(chunk.Sources, chunk.Source)
 }
 
 func safeRuneLen(text string) int {
@@ -49,4 +44,17 @@ func safeRuneLen(text string) int {
 func hashText(text string) string {
 	sum := sha256.Sum256([]byte(text))
 	return fmt.Sprintf("%x", sum[:6])
+}
+
+func stableArtifactKeyParts(parts ...string) string {
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		value := strings.TrimSpace(strings.ToLower(part))
+		if value == "" {
+			continue
+		}
+		items = append(items, sanitizeKeyPart(value))
+	}
+	sort.Strings(items)
+	return strings.Join(items, ":")
 }
