@@ -3,21 +3,22 @@ package client
 import (
 	"context"
 
-	"context-refiner/internal/engine"
+	refinerv1 "context-refiner/api/refinerv1"
+	serviceapi "context-refiner/pkg/service"
 )
 
-type Refiner interface {
-	Run(ctx context.Context, req *engine.RefineRequest) (*engine.RefineResponse, error)
-}
-
 type Client struct {
-	refiner Refiner
+	refiner serviceapi.RefinerService
 }
 
-func New(refiner Refiner) *Client {
+func New(refiner serviceapi.RefinerService) *Client {
 	return &Client{refiner: refiner}
 }
 
-func (c *Client) Refine(ctx context.Context, req *engine.RefineRequest) (*engine.RefineResponse, error) {
-	return c.refiner.Run(ctx, req)
+func (c *Client) Refine(ctx context.Context, req *refinerv1.RefineRequest) (*refinerv1.RefineResponse, error) {
+	return c.refiner.Refine(ctx, req)
+}
+
+func (c *Client) PageIn(ctx context.Context, req *refinerv1.PageInRequest) (*refinerv1.PageInResponse, error) {
+	return c.refiner.PageIn(ctx, req)
 }

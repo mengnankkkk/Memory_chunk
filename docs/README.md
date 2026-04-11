@@ -4,6 +4,9 @@
 - 更新日期：`2026-04-07`
 - 文档类型：`Documentation Index`
 
+> 2026-04-11 起，代码结构请优先以 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md) 为准。
+> 如果你是来看目录分层和职责，不要先看旧的 `docs/code-design.md`，先看新的分层文档。
+
 ## 1. 文档集说明
 
 本目录不再使用“一份超大总文档包打天下”的方式，而是拆成多份聚焦文档。
@@ -30,10 +33,11 @@
 
 - [docs/quickstart.md](/E:/github/Memory_chunk/docs/quickstart.md)
 
-### 2.3 先想理解代码结构
+### 2.3 先想理解代码结构 / 分层
 
 看：
 
+- [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md)
 - [docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
 
 ### 2.4 先想系统学习这个项目

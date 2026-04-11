@@ -42,8 +42,8 @@
 
 ### 2.3 状态层与回填
 
-- [x] Redis PageStore
-- [x] Redis Stream SummaryJobQueue
+- [x] `PageRepository` / `SummaryJobRepository` contract
+- [x] Redis repository implementation
 - [x] summary worker 消费任务
 - [x] 摘要写回 Redis
 - [x] `PageIn` 优先返回摘要结果

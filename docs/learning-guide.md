@@ -1,7 +1,7 @@
 # Context Refiner 学习解析文档
 
-- 文档版本：`v2026.04.06`
-- 更新日期：`2026-04-06`
+- 文档版本：`v2026.04.11`
+- 更新日期：`2026-04-11`
 - 文档类型：`Learning Guide`
 - 适用代码基线：`main` 分支当前实现
 
@@ -12,6 +12,9 @@
 - 第一次接触这个项目的人
 - 想系统理解代码而不是只会跑命令的人
 - 想把这个项目当成“上下文治理服务范例”来学习的人
+
+> 2026-04-11 之后，代码结构已重构为 `adapter -> service -> core -> infra` 分层。
+> 学习目录职责时请先结合 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md) 一起看。
 
 ## 2. 学这个项目之前，先抓住两个核心问题
 
@@ -57,7 +60,9 @@
 
 读：
 
-- [cmd/main.go](/E:/github/Memory_chunk/cmd/main.go)
+- [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md)
+- [cmd/refiner/main.go](/E:/github/Memory_chunk/cmd/refiner/main.go)
+- [internal/bootstrap/runtime.go](/E:/github/Memory_chunk/internal/bootstrap/runtime.go)
 - [api/refiner.proto](/E:/github/Memory_chunk/api/refiner.proto)
 
 要观察：
@@ -70,7 +75,11 @@
 
 读：
 
-- [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go)
+- [internal/adapter/grpc/refiner_handler.go](/E:/github/Memory_chunk/internal/adapter/grpc/refiner_handler.go)
+- [pkg/service/refiner.go](/E:/github/Memory_chunk/pkg/service/refiner.go)
+- [internal/service/refiner_service.go](/E:/github/Memory_chunk/internal/service/refiner_service.go)
+- [internal/service/request_mapping.go](/E:/github/Memory_chunk/internal/service/request_mapping.go)
+- [internal/service/response_mapping.go](/E:/github/Memory_chunk/internal/service/response_mapping.go)
 
 要重点看：
 
@@ -79,13 +88,14 @@
 - `Refine`
 - `PageIn`
 
-这一层决定了协议边界和内部对象边界。
+这一层决定了协议边界、公开服务接口，以及应用服务和内部对象边界。
 
 ### 第四步：理解 pipeline 是怎么跑的
 
 读：
 
-- [internal/engine/pipeline.go](/E:/github/Memory_chunk/internal/engine/pipeline.go)
+- [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go)
+- [internal/core/registry.go](/E:/github/Memory_chunk/internal/core/registry.go)
 
 你需要理解：
 
@@ -97,10 +107,11 @@
 
 读：
 
-- [internal/processor/paging.go](/E:/github/Memory_chunk/internal/processor/paging.go)
-- [internal/processor/collapse.go](/E:/github/Memory_chunk/internal/processor/collapse.go)
-- [internal/processor/structured.go](/E:/github/Memory_chunk/internal/processor/structured.go)
-- [internal/processor/auto.go](/E:/github/Memory_chunk/internal/processor/auto.go)
+- [internal/core/processor/paging.go](/E:/github/Memory_chunk/internal/core/processor/paging.go)
+- [internal/core/processor/collapse.go](/E:/github/Memory_chunk/internal/core/processor/collapse.go)
+- [internal/core/processor/structured.go](/E:/github/Memory_chunk/internal/core/processor/structured.go)
+- [internal/core/processor/auto.go](/E:/github/Memory_chunk/internal/core/processor/auto.go)
+- [internal/support/heuristic/extract.go](/E:/github/Memory_chunk/internal/support/heuristic/extract.go)
 
 学习时不要只看“做了什么”，还要看“为什么这一类逻辑被拆成独立 Processor”。
 
@@ -108,8 +119,10 @@
 
 读：
 
-- [internal/store/redis.go](/E:/github/Memory_chunk/internal/store/redis.go)
-- [internal/summary/worker.go](/E:/github/Memory_chunk/internal/summary/worker.go)
+- [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go)
+- [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
+- [internal/infra/summary/worker.go](/E:/github/Memory_chunk/internal/infra/summary/worker.go)
+- [internal/infra/config/config.go](/E:/github/Memory_chunk/internal/infra/config/config.go)
 
 你要理解：
 
@@ -123,22 +136,24 @@
 如果你只有 30 分钟，建议按下面顺序：
 
 1. [docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
-2. [cmd/main.go](/E:/github/Memory_chunk/cmd/main.go)
-3. [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go)
-4. [internal/engine/pipeline.go](/E:/github/Memory_chunk/internal/engine/pipeline.go)
-5. [internal/processor/paging.go](/E:/github/Memory_chunk/internal/processor/paging.go)
-6. [internal/store/redis.go](/E:/github/Memory_chunk/internal/store/redis.go)
+2. [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md)
+3. [cmd/refiner/main.go](/E:/github/Memory_chunk/cmd/refiner/main.go)
+4. [internal/service/refiner_service.go](/E:/github/Memory_chunk/internal/service/refiner_service.go)
+5. [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go)
+6. [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go)
+7. [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
 
 这样至少能理解主干。
 
 ## 5. 一条推荐的 2 小时深入路径
 
 1. 阅读 [docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
-2. 阅读 [docs/principles-and-internals.md](/E:/github/Memory_chunk/docs/principles-and-internals.md)
-3. 逐个过 `api -> server -> engine -> processor -> store -> summary`
-4. 手动画一条 `Refine` 主链
-5. 手动画一条 `PageIn` 主链
-6. 对照 [docs/todolist.md](/E:/github/Memory_chunk/docs/todolist.md) 看哪些是已完成、哪些是未来计划
+2. 阅读 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md)
+3. 阅读 [docs/principles-and-internals.md](/E:/github/Memory_chunk/docs/principles-and-internals.md)
+4. 逐个过 `api -> adapter -> service -> core -> infra`
+5. 手动画一条 `Refine` 主链
+6. 手动画一条 `PageIn` 主链
+7. 对照 [docs/todolist.md](/E:/github/Memory_chunk/docs/todolist.md) 看哪些是已完成、哪些是未来计划
 
 ## 6. 学这个项目时最容易卡住的点
 

@@ -1,5 +1,9 @@
 # Context Refiner Agent Guide
 
+> 2026-04-11 结构重构后，请优先按新的分层理解项目：
+> `api -> pkg/service -> internal/service -> internal/core -> internal/infra -> internal/bootstrap -> cmd/refiner`
+> 路径细节与职责边界以 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md) 为准。
+
 ## 1. 项目定位
 
 `Context Refiner` 是一个位于 AI 应用层与大模型 API 之间的 Go gRPC 上下文清洗服务。
@@ -19,52 +23,53 @@
 2. [docs/README.md](/E:/github/Memory_chunk/docs/README.md)
 3. [docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
 4. [docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
-5. [cmd/main.go](/E:/github/Memory_chunk/cmd/main.go)
-6. [cmd/runtime.go](/E:/github/Memory_chunk/cmd/runtime.go)
-7. [cmd/registry.go](/E:/github/Memory_chunk/cmd/registry.go)
-8. [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go)
-9. [internal/engine/pipeline.go](/E:/github/Memory_chunk/internal/engine/pipeline.go)
+5. [cmd/refiner/main.go](/E:/github/Memory_chunk/cmd/refiner/main.go)
+6. [internal/bootstrap/runtime.go](/E:/github/Memory_chunk/internal/bootstrap/runtime.go)
+7. [internal/bootstrap/processors.go](/E:/github/Memory_chunk/internal/bootstrap/processors.go)
+8. [internal/service/refiner_service.go](/E:/github/Memory_chunk/internal/service/refiner_service.go)
+9. [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go)
 
 ## 3. 关键目录
 
-- [cmd](/E:/github/Memory_chunk/cmd)：程序入口、runtime 组装与 registry 注册
-- [internal/config](/E:/github/Memory_chunk/internal/config)：配置与策略解析
-- [internal/engine](/E:/github/Memory_chunk/internal/engine)：领域模型、pipeline、registry
-- [internal/processor](/E:/github/Memory_chunk/internal/processor)：上下文治理动作
-- [internal/heuristic](/E:/github/Memory_chunk/internal/heuristic)：跨包复用的启发式文本整理规则
-- [internal/server](/E:/github/Memory_chunk/internal/server)：gRPC handler 与 request/response mapping
-- [internal/store](/E:/github/Memory_chunk/internal/store)：Redis page store 与 summary queue
-- [internal/summary](/E:/github/Memory_chunk/internal/summary)：summary worker 与启发式渲染
+- [cmd/refiner](/E:/github/Memory_chunk/cmd/refiner)：程序启动入口
+- [internal/bootstrap](/E:/github/Memory_chunk/internal/bootstrap)：runtime 组装与 processor 注册
+- [internal/service](/E:/github/Memory_chunk/internal/service)：应用服务、request/response mapping
+- [internal/adapter/grpc](/E:/github/Memory_chunk/internal/adapter/grpc)：gRPC 适配层
+- [internal/core](/E:/github/Memory_chunk/internal/core)：领域模型、pipeline、registry
+- [internal/core/processor](/E:/github/Memory_chunk/internal/core/processor)：上下文治理动作
+- [internal/infra](/E:/github/Memory_chunk/internal/infra)：配置、Redis、summary、tokenizer
+- [internal/support/heuristic](/E:/github/Memory_chunk/internal/support/heuristic)：跨包复用的启发式文本整理规则
 - [docs](/E:/github/Memory_chunk/docs)：项目主文档体系
 
 ## 4. 不变约束
 
 - 基本业务逻辑以 `Refine -> Pipeline -> Processor -> Assemble` 主链为准，不要为“看起来更优雅”随意改协议行为。
 - `processor` 的主要职责是变换 `RefineRequest`，并同步维护 `CurrentTokens`、`Audits`、`PendingSummaryJobIDs`。
-- `server` 层只做协议映射、策略解析与错误边界控制，不应下沉复杂治理逻辑。
+- `adapter/grpc` 层只做协议适配，不应下沉复杂治理逻辑。
+- `service` 层负责应用主流程，但不要吞掉 `core` 的独立性。
 - `summary` 当前仍是启发式摘要，不要把它误当成最终的 LLM provider 抽象。
-- `internal/heuristic` 用来承接重复的启发式规则；不要再新增语义模糊的 `util/common/misc` 包。
+- `internal/support/heuristic` 用来承接重复的启发式规则；不要再新增语义模糊的 `util/common/misc` 包。
 
 ## 5. 常见改动入口
 
 ### 新增或调整处理器
 
-1. 在 [internal/processor](/E:/github/Memory_chunk/internal/processor) 新增或修改实现
-2. 在 [cmd/registry.go](/E:/github/Memory_chunk/cmd/registry.go) 的 `buildRegistry` 中注册
+1. 在 [internal/core/processor](/E:/github/Memory_chunk/internal/core/processor) 新增或修改实现
+2. 在 [internal/bootstrap/processors.go](/E:/github/Memory_chunk/internal/bootstrap/processors.go) 的 `buildRegistry` 中注册
 3. 在 [config/policies.yaml](/E:/github/Memory_chunk/config/policies.yaml) 中编排步骤
 4. 更新 [docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
 
 ### 调整协议映射
 
-1. 修改 [internal/server/request_mapping.go](/E:/github/Memory_chunk/internal/server/request_mapping.go) 和 [internal/server/response_mapping.go](/E:/github/Memory_chunk/internal/server/response_mapping.go)
-2. 保持 [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go) 只负责 handler 主流程
+1. 修改 [internal/service/request_mapping.go](/E:/github/Memory_chunk/internal/service/request_mapping.go) 和 [internal/service/response_mapping.go](/E:/github/Memory_chunk/internal/service/response_mapping.go)
+2. 保持 [internal/adapter/grpc/refiner_handler.go](/E:/github/Memory_chunk/internal/adapter/grpc/refiner_handler.go) 只负责 gRPC 委托
 3. 检查响应字段与审计字段是否仍然自洽
 
 ### 调整启发式摘要或结构化提取规则
 
-1. 优先检查 [internal/heuristic/json.go](/E:/github/Memory_chunk/internal/heuristic/json.go)、[internal/heuristic/extract.go](/E:/github/Memory_chunk/internal/heuristic/extract.go)、[internal/heuristic/lines.go](/E:/github/Memory_chunk/internal/heuristic/lines.go)
-2. 再看 [internal/processor/structured.go](/E:/github/Memory_chunk/internal/processor/structured.go)
-3. 再看 [internal/summary/summarizer.go](/E:/github/Memory_chunk/internal/summary/summarizer.go)
+1. 优先检查 [internal/support/heuristic/json.go](/E:/github/Memory_chunk/internal/support/heuristic/json.go)、[internal/support/heuristic/extract.go](/E:/github/Memory_chunk/internal/support/heuristic/extract.go)、[internal/support/heuristic/lines.go](/E:/github/Memory_chunk/internal/support/heuristic/lines.go)
+2. 再看 [internal/core/processor/structured.go](/E:/github/Memory_chunk/internal/core/processor/structured.go)
+3. 再看 [internal/infra/summary/summarizer.go](/E:/github/Memory_chunk/internal/infra/summary/summarizer.go)
 
 ## 6. 验证方式
 
@@ -77,8 +82,8 @@ go test ./...
 
 如果改动涉及：
 
-- Redis 读写：补充检查 [internal/store/redis.go](/E:/github/Memory_chunk/internal/store/redis.go)
-- 配置：检查 [config/service.yaml](/E:/github/Memory_chunk/config/service.yaml) 与 [internal/config/config.go](/E:/github/Memory_chunk/internal/config/config.go)
+- Redis 读写：补充检查 [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go) 和 [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
+- 配置：检查 [config/service.yaml](/E:/github/Memory_chunk/config/service.yaml) 与 [internal/infra/config/config.go](/E:/github/Memory_chunk/internal/infra/config/config.go)
 - 文档入口：同步更新 [README.md](/E:/github/Memory_chunk/README.md) 与 [docs/README.md](/E:/github/Memory_chunk/docs/README.md)
 
 ## 7. 文档同步规则

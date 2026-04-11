@@ -1,7 +1,7 @@
 # Context Refiner 测试计划
 
-- 文档版本：`v2026.04.06`
-- 更新日期：`2026-04-06`
+- 文档版本：`v2026.04.11`
+- 更新日期：`2026-04-11`
 - 文档类型：`Testing / Plan`
 - 适用代码基线：`main` 分支当前实现
 
@@ -25,8 +25,8 @@
 基于当前仓库内容，可以确认：
 
 - `go test ./...` 可以执行
-- 但当前没有任何 `_test.go` 文件
-- 这意味着“能跑测试”不等于“已经有测试覆盖”
+- 当前已经有少量 `_test.go` 文件，但覆盖面仍非常薄
+- 这意味着“能跑测试”不等于“关键链路已经被保护”
 
 当前风险不是单点风险，而是整条链路都缺少回归保护：
 
@@ -60,10 +60,10 @@
 
 优先覆盖：
 
-- `internal/config`
-- `internal/server` 中的 request / response mapping
-- `internal/summary` 中的摘要启发式逻辑
-- `internal/processor` 中不依赖外部 Redis 的处理器逻辑
+- `internal/infra/config`
+- `internal/service` 中的 request / response mapping
+- `internal/infra/summary` 中的摘要启发式逻辑
+- `internal/core/processor` 中不依赖外部 Redis 的处理器逻辑
 
 适合验证的内容：
 
@@ -80,9 +80,9 @@
 
 优先覆盖：
 
-- `internal/store/redis.go`
-- `internal/server/refiner.go`
-- `internal/summary/worker.go`
+- `internal/infra/store/redis/repository.go`
+- `internal/service/refiner_service.go`
+- `internal/infra/summary/worker.go`
 
 建议拆成两类：
 
@@ -124,12 +124,12 @@ gRPC 服务集成测试重点：
 
 建议按下面顺序补测试，而不是全面铺开：
 
-1. `internal/server` 的 request / response mapping
-2. `internal/summary` 的摘要逻辑
-3. `internal/config` 的加载与校验
-4. `internal/store` 的 Redis 集成测试
-5. `internal/server` 的 `Refine` / `PageIn` 集成测试
-6. `internal/summary` worker 的消费与写回集成测试
+1. `internal/service` 的 request / response mapping
+2. `internal/infra/summary` 的摘要逻辑
+3. `internal/infra/config` 的加载与校验
+4. `internal/infra/store` 的 Redis 集成测试
+5. `internal/service` 的 `Refine` / `PageIn` 集成测试
+6. `internal/infra/summary` worker 的消费与写回集成测试
 7. 最小端到端冒烟测试
 
 这样排序的原因：
@@ -254,7 +254,7 @@ go test ./...
 docker run --name context-refiner-redis-test -p 6379:6379 -d redis:7
 ```
 
-然后执行与 `store`、`server`、`summary` 相关的集成测试。
+然后执行与 `infra/store`、`service`、`infra/summary` 相关的集成测试。
 
 对于 gRPC 层，建议优先使用：
 
@@ -269,7 +269,7 @@ docker run --name context-refiner-redis-test -p 6379:6379 -d redis:7
 
 完成标准：
 
-- 至少补齐 `config`、`server mapping`、`summary` 的单测
+- 至少补齐 `infra/config`、`service mapping`、`infra/summary` 的单测
 - `go test ./...` 不再全部是 `no test files`
 
 ### Phase B：保护核心运行链路
@@ -305,10 +305,10 @@ docker run --name context-refiner-redis-test -p 6379:6379 -d redis:7
 
 如果现在就开始补测试，建议这样推进：
 
-1. 先补 `internal/server/refiner.go` 的 request / response mapping
-2. 再补 `internal/summary/worker.go` 中的摘要逻辑
-3. 再补 `internal/config/config.go` 与 `policy.go`
-4. 然后补 `internal/store/redis.go`
+1. 先补 `internal/service/request_mapping.go` 与 `response_mapping.go`
+2. 再补 `internal/infra/summary/summarizer.go` 中的摘要逻辑
+3. 再补 `internal/infra/config/config.go` 与 `policy.go`
+4. 然后补 `internal/infra/store/redis/repository.go`
 5. 再补 `Refine` / `PageIn` 服务集成测试
 6. 最后补最小冒烟测试脚本或手工验证步骤
 

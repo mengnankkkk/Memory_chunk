@@ -72,7 +72,7 @@ docker run --name context-refiner-redis -p 6379:6379 -d redis:7
 在仓库根目录执行：
 
 ```powershell
-go run ./cmd
+go run ./cmd/refiner
 ```
 
 如果配置正确，你会看到类似日志：
@@ -192,7 +192,7 @@ grpcurl -plaintext -import-path . -proto api/refiner.proto -d "{
 1. 填写 `service.yaml`
 2. 启动 Redis
 3. 运行 `go build ./...`
-4. 运行 `go run ./cmd`
+4. 运行 `go run ./cmd/refiner`
 5. 用 `grpcurl` 调一次 `Refine`
 6. 观察是否返回 `paged_chunks`
 7. 再调一次 `PageIn`

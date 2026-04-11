@@ -1,5 +1,8 @@
 # Context Refiner
 
+> 2026-04-11 结构重构后，当前生效的分层说明请优先看 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md)。
+> 当前代码组织已经调整为 `api + service + adapter + core + infra + bootstrap`。
+
 一个位于 AI 应用层与大模型 API 之间的 Go gRPC 上下文清洗服务。
 
 根目录这份 README 现在只承担一件事：

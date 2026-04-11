@@ -1,9 +1,11 @@
 # Context Refiner 总体架构设计
 
-- 文档版本：`v2026.04.06`
-- 更新日期：`2026-04-06`
+- 文档版本：`v2026.04.11`
+- 更新日期：`2026-04-11`
 - 文档类型：`Architecture Overview`
 - 适用代码基线：`main` 分支当前实现
+
+> 2026-04-11 结构重构后，分层实现与目录职责请结合 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md) 一起看。
 
 ## 1. 文档目标
 
@@ -66,13 +68,13 @@
 Client / App
     |
     v
-gRPC Ingress
+gRPC Adapter
     |
     v
-Request Mapping
+Application Service
     |
     v
-Pipeline Engine
+Core Pipeline
     |
     +--> Processor Chain
     |      |- paging
@@ -86,7 +88,7 @@ Pipeline Engine
     |
     +--> Audit Output
     |
-    +--> Redis PageStore / Summary Store / Stream Queue
+    +--> Infra Store / Summary Queue / Tokenizer
     |
     `--> PageIn / Summary Fallback
 ```
@@ -104,12 +106,13 @@ Pipeline Engine
 当前实现：
 
 - [api/refiner.proto](/E:/github/Memory_chunk/api/refiner.proto)
-- [internal/server/refiner.go](/E:/github/Memory_chunk/internal/server/refiner.go)
+- [internal/adapter/grpc/refiner_handler.go](/E:/github/Memory_chunk/internal/adapter/grpc/refiner_handler.go)
 
-### 6.2 Protocol Mapping 层
+### 6.2 Application Service / Mapping 层
 
 职责：
 
+- 承接公开的 service API
 - protobuf 与内部结构互转
 - `request_id` 自动补全
 - `source -> sources`
@@ -117,8 +120,16 @@ Pipeline Engine
 
 设计价值：
 
+- gRPC 传输层与应用服务解耦
 - 协议层兼容历史调用方式
 - 内部逻辑统一围绕结构化对象工作
+
+当前实现：
+
+- [pkg/service/refiner.go](/E:/github/Memory_chunk/pkg/service/refiner.go)
+- [internal/service/refiner_service.go](/E:/github/Memory_chunk/internal/service/refiner_service.go)
+- [internal/service/request_mapping.go](/E:/github/Memory_chunk/internal/service/request_mapping.go)
+- [internal/service/response_mapping.go](/E:/github/Memory_chunk/internal/service/response_mapping.go)
 
 ### 6.3 Pipeline Engine 层
 
@@ -131,8 +142,8 @@ Pipeline Engine
 
 当前实现：
 
-- [internal/engine/pipeline.go](/E:/github/Memory_chunk/internal/engine/pipeline.go)
-- [internal/engine/registry.go](/E:/github/Memory_chunk/internal/engine/registry.go)
+- [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go)
+- [internal/core/registry.go](/E:/github/Memory_chunk/internal/core/registry.go)
 
 ### 6.4 Processor 层
 
@@ -167,8 +178,9 @@ Pipeline Engine
 
 当前实现：
 
-- [internal/store/redis.go](/E:/github/Memory_chunk/internal/store/redis.go)
-- [internal/summary/worker.go](/E:/github/Memory_chunk/internal/summary/worker.go)
+- [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go)
+- [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
+- [internal/infra/summary/worker.go](/E:/github/Memory_chunk/internal/infra/summary/worker.go)
 
 ### 6.6 Egress 层
 
@@ -236,6 +248,7 @@ Pipeline Engine
 
 ```text
 RefineRequest
+  -> gRPC adapter
   -> mapRequest
   -> resolve policy
   -> build pipeline
@@ -291,13 +304,13 @@ large chunk after sync compaction
 - `config/service.yaml` 中真实地址仍为空
 - `summary worker` 仍然是启发式摘要
 - 回填结果当前更接近 page 级摘要，而不是 chunk 级摘要对象
-- 没有自动化测试文件
+- 自动化测试仍然不足，目前只有少量单测起步
 - 没有 Prometheus / Tracing / 回归评测工具
 
 ### 10.2 这意味着什么
 
 - 当前代码可以 `go build ./...`
-- 当前代码也可以 `go test ./...`，但所有包都没有测试文件
+- 当前代码也可以 `go test ./...`，但测试覆盖仍不足以保护主链
 - 当前系统主链可以视为“可开发、可继续扩展”
 - 当前系统不能视为“可直接生产部署”
 
