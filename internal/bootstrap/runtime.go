@@ -184,7 +184,7 @@ func prewarmPrefixCache(ctx context.Context, cfg *config.AppConfig, counter core
 			RAGPrefixTokens:      identity.RAGPrefixTokens,
 			PromptLayoutVersion:  "stable-prefix-v2",
 			ArtifactKeyVersion:   "content-addressed-v1",
-			CacheOptimizationAim: "prefix-hit-rate",
+			CacheOptimizationAim: "prefix-reuse-stability",
 			NormalizationVersion: identity.NormalizationVersion,
 		}); err != nil {
 			return fmt.Errorf("prewarm prefix cache %s failed: %w", item.Name, err)

@@ -1,7 +1,7 @@
 # Context Refiner Todo / Snapshot
 
-- 文档版本：`v2026.04.11`
-- 更新日期：`2026-04-11`
+- 文档版本：`v2026.04.13`
+- 更新日期：`2026-04-13`
 - 文档类型：`Snapshot / Todo / Archive`
 - 适用代码基线：`main` 分支当前实现
 
@@ -9,7 +9,7 @@
 
 ### 1.1 项目状态
 
-- 当前阶段：`核心底盘已成型，应用层 KV 命中优化已完成到 D，尚未产品化完成`
+- 当前阶段：`核心底盘已成型，应用层 KV 命中优化已完成到 D，已进入工程化补齐阶段，尚未产品化完成`
 - 当前主要定位：`应用层上下文清洗与稳定化接口，不负责模型层 KV block 管理`
 - 当前最关键缺口：`测试闭环`、`Explain / dry-run`、`离线 replay 评测`、`真实摘要 provider`
 
@@ -23,6 +23,7 @@
 - 已有应用层 `miss reason` 诊断
 - 已有应用层 cache 策略：
   说明：`admission policy`、`namespace`、`TTL 分层`、`热点前缀统计`、`prewarm`
+- 已有少量单元测试起步，`go test ./...` 当前可通过
 
 ### 1.3 当前应用层 KV 优化完成度
 
@@ -35,20 +36,21 @@
 
 ### 1.4 当前仍未完成的关键能力
 
-- 当前没有任何测试文件
+- 当前已有少量 `_test.go` 文件，但还没有形成覆盖主链的测试闭环
 - 当前默认配置仍为占位值，不能直接开箱启动
 - 当前 summary worker 仍为启发式摘要
 - 当前摘要回填仍偏 page 级
+- 当前还没有固化应用层“可命中性预测”语义与解释输出
 - 当前还没有 `dry_run / explain / cache debug`
-- 当前还没有离线 replay / prefix churn / top miss dashboard
+- 当前虽然已有基础 overview dashboard，但还没有离线 replay / prefix churn / top miss dashboard / alerting
 
 ## 2. 未完成任务
 
 ### 2.1 P0 产品化闭环
 
+- [ ] 补 `service mapping / summary / config` 最小单元测试闭环
+- [ ] 补 `Refine` / `PageIn` / Redis / worker 集成测试
 - [ ] 补最小本地运行方案
-- [ ] 补单元测试
-- [ ] 补 `Refine` / `PageIn` 集成测试
 - [ ] 清理配置占位与启动说明
 - [ ] 补 cache-aware 回归测试
 
@@ -61,6 +63,51 @@
 - [ ] 支持 chunk 级 summary artifact
 
 ### 2.3 应用层 KV 下一阶段
+
+#### 2.3.0 2026-04-13 调研结论
+
+- [ ] 明确系统边界：
+  说明：本服务负责“应用层可命中性诊断与前缀稳定化优化”，不负责生产“下游真实 KV cache 命中监控”
+- [ ] 明确应用层命中语义：
+  说明：`predicted hit/miss` 只代表规范化后的稳定前缀是否更可能被复用，属于应用层诊断信号，不等同于任何下游真实 KV 命中结果
+- [ ] 应用层观测设计坚持“计数器优先，不直接存 hit rate”：
+  说明：优先记录 `eligible / admitted / reusable / miss_reason / segment_churn` 等应用层计数器，比例指标交给 PromQL、dashboard 或 replay 计算
+- [ ] 指标标签保持低基数：
+  说明：Prometheus 不适合直接挂 `prefix_hash / session_id / tenant_id` 这类高基数字段；热点前缀与 TopN 应通过 Redis 排行、debug 导出或离线报表承载
+- [ ] 命中优化必须围绕“精确前缀一致性”：
+  说明：静态内容要前置、动态内容要后置；`tools / system / memory / rag / active_turn` 任何前缀段变化都可能破坏应用层可复用性判断
+- [ ] 应用层诊断必须保持可解释：
+  说明：继续依赖 `combined/system/memory/rag hash`、`miss_reason`、`segment_reason`、`normalization_version` 做可解释诊断，但不要把它误写成真实 KV 命中率
+
+#### 2.3.1 应用层可命中性诊断计划
+
+- [ ] 定义统一命中分类枚举
+  说明：至少区分 `predicted_hit`、`predicted_miss`、`partial_reusable`、`unstable_prefix`、`unknown`
+- [ ] 在 `RefineResponse.metadata` 增加观测层级字段
+  说明：补 `cache_observation_level`、`cache_prediction_result`、`predicted_reusable_tokens`、`segment_churn_reason`
+- [ ] 增加“可缓存资格 -> admission -> lookup”应用层漏斗指标
+  说明：我方先聚焦 `ineligible`、`short_prefix`、`low_value_prefix`、`admitted`、`created`、`predicted_reusable`
+- [ ] 增加 segment churn 计数器
+  说明：分别统计 `system / memory / rag / normalization / model` 导致的稳定前缀破坏次数，直接服务优化优先级
+- [ ] 增加 predicted reusable tokens 统计
+  说明：记录理论可复用 token 规模，用于比较不同 canonicalize / layout 策略的优化收益
+- [ ] 增加 top miss waterfall / top segment churn 诊断面板
+  说明：面板重点展示“哪类失稳在增多”“哪一段最破坏稳定前缀”，服务应用层治理优先级
+
+#### 2.3.2 应用层命中优化计划
+
+- [ ] 增加稳定前缀布局版本治理
+  说明：显式管理 `prompt_layout_version`，避免布局变化导致命中回退却难以定位
+- [ ] 继续清洗高抖动字段并补 deterministic serialization
+  说明：重点检查 JSON key 顺序、tool schema 顺序、URL/path/source 标准化、时间戳/随机 ID/trace 字段
+- [ ] 为 `tools / system / memory / rag` 增加更严格的边界与 diff 视图
+  说明：便于识别究竟是哪一层引入了不稳定变化
+- [ ] 扩展 prewarm 策略
+  说明：从固定 system prompt 扩展到固定 tools、固定 memory 模板、固定 RAG 模板，并记录命中收益
+- [ ] 增加 cache-aware replay 数据集
+  说明：为典型 workload 固化 `system/tool/memory/rag` 组合样本，比较 canonicalize 前后与 layout 变更前后的命中改善
+- [ ] 在 `dry_run / explain` 中补 cache optimization 建议
+  说明：返回“建议前置哪些内容、哪些字段高抖动、哪一段最值得稳定化”
 
 #### E. Explain / Debug 能力
 
@@ -76,10 +123,10 @@
 - [ ] 增加 top miss reason 指标与面板
 - [ ] 增加 top hot prefix 统计视图
 - [ ] 增加 canonicalize 前后 token 变化统计
-- [ ] 增加历史请求 replay 工具，用于离线计算 prefix hit ratio
+- [ ] 增加历史请求 replay 工具，用于离线估计 predicted reusable ratio 并比较不同策略的优化收益
 - [ ] 增加“哪个 processor 破坏稳定前缀最多”的分析
-- [ ] 增加 prefix hit / miss reason dashboard
-- [ ] 增加 dashboard alerting
+- [ ] 增加 predicted reuse / miss reason dashboard
+- [ ] 增加应用层 churn / miss 异常可见性与可选告警
 
 ### 2.4 其他增强
 
@@ -90,10 +137,13 @@
 
 ### 2.5 当前建议顺序
 
-1. 先补 `Explain / dry-run / cache debug`
-2. 再补 `replay / dashboard / alerting`
-3. 再补 `测试与最小运行闭环`
-4. 最后继续 `摘要链路升级与高级 Processor`
+1. 先补 `最小测试护栏（service mapping / summary / config）`
+2. 再定义 `应用层预测` 的语义、metadata 字段和解释输出
+3. 再补 `低基数 metrics + miss/churn 诊断面板`
+4. 再补 `Explain / dry-run / cache debug`
+5. 再补 `cache-aware replay / canonicalize-layout 对比` 评测
+6. 再补 `Refine / PageIn / Redis / worker` 集成测试与最小运行闭环
+7. 最后继续 `摘要链路升级与高级 Processor`
 
 ## 3. 已完成任务归档
 

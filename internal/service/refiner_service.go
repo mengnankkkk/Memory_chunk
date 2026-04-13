@@ -117,7 +117,6 @@ func (s *RefinerApplicationService) Refine(ctx context.Context, req *refinerv1.R
 		attribute.String("refiner.prefix_cache_miss_reason", metadataString(resp.Metadata, "prefix_cache_miss_reason")),
 		attribute.String("refiner.prefix_cache_segment_reason", metadataString(resp.Metadata, "prefix_cache_segment_reason")),
 		attribute.String("refiner.prefix_cache_key", metadataString(resp.Metadata, "prefix_cache_key")),
-		attribute.String("refiner.downstream_kv_reuse_hint", metadataString(resp.Metadata, "downstream_kv_reuse_hint")),
 		attribute.Int("refiner.pending_summary_jobs", len(resp.PendingSummaryJobIDs)),
 		attribute.Int("refiner.paged_chunks", len(resp.PagedChunks)),
 	)

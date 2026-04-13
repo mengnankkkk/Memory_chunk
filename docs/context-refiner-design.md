@@ -1,7 +1,7 @@
 # Context Refiner 总体架构设计
 
-- 文档版本：`v2026.04.11`
-- 更新日期：`2026-04-11`
+- 文档版本：`v2026.04.13`
+- 更新日期：`2026-04-13`
 - 文档类型：`Architecture Overview`
 - 适用代码基线：`main` 分支当前实现
 
@@ -402,7 +402,7 @@ large chunk after sync compaction
 
 基于当前代码和构建结果，项目所处阶段不是“概念验证”，而是：
 
-`核心底盘已成型，正在向产品化工程能力过渡`
+`核心底盘已成型，应用层 KV A-D 已落地，正在向产品化工程能力过渡`
 
 更细化地说：
 
@@ -420,6 +420,7 @@ large chunk after sync compaction
 - `summary worker` 仍然是启发式摘要
 - 回填结果当前更接近 page 级摘要，而不是 chunk 级摘要对象
 - 自动化测试仍然不足，目前只有少量单测起步
+  例如：`token_split` 与 `heuristic` 文本处理已有单测，但 `service / store / worker` 主链仍缺保护
 - 已有 Prometheus Metrics
 - 已有应用层 Tracing 与 Dashboard
 - 没有回归评测工具
@@ -437,17 +438,19 @@ large chunk after sync compaction
 
 当前最值得推进的三条主线是：
 
-1. 应用层 KV 的 Explain / 观测 / 评测闭环
-2. 摘要 Provider 抽象
-3. 更细粒度的结构化治理
+1. 最小测试闭环与接口契约保护
+2. 应用层 KV 的 Explain / dry-run / 观测 / 评测闭环
+3. 摘要 Provider 抽象与更细粒度的结构化治理
 
 推荐顺序：
 
-1. 先补 `dry_run / explain / cache debug / normalized preview`
-2. 再补 replay、dashboard、alerting 与 prefix churn 分析
-3. 再抽象 Summary Provider
-4. 再接真实外部摘要模型
-5. 再把摘要从 page 级字符串提升成 chunk 级结构化对象
+1. 先补 `service mapping / summary / config` 最小单测闭环
+2. 再补 `dry_run / explain / cache debug / normalized preview`
+3. 再补 `Refine / PageIn / Redis / worker` 集成测试与最小运行闭环
+4. 再补 replay、dashboard、alerting 与 prefix churn 分析
+5. 再抽象 Summary Provider
+6. 再接真实外部摘要模型
+7. 再把摘要从 page 级字符串提升成 chunk 级结构化对象
 
 ## 12. 结论
 

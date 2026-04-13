@@ -28,7 +28,7 @@ func mapRequest(req *refinerv1.RefineRequest, policy core.RuntimePolicy) *core.R
 			"prompt_layout_version":     "stable-prefix-v2",
 			"normalization_version":     "stable-prefix-v2",
 			"artifact_key_version":      "content-addressed-v1",
-			"cache_optimization_target": "prefix-hit-rate",
+			"cache_optimization_target": "prefix-reuse-stability",
 		},
 	}
 }

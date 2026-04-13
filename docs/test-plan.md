@@ -1,7 +1,7 @@
 # Context Refiner 测试计划
 
-- 文档版本：`v2026.04.11`
-- 更新日期：`2026-04-11`
+- 文档版本：`v2026.04.13`
+- 更新日期：`2026-04-13`
 - 文档类型：`Testing / Plan`
 - 适用代码基线：`main` 分支当前实现
 
@@ -24,8 +24,10 @@
 
 基于当前仓库内容，可以确认：
 
-- `go test ./...` 可以执行
-- 当前已经有少量 `_test.go` 文件，但覆盖面仍非常薄
+- `go test ./...` 当前可执行并通过
+- 当前已经有少量 `_test.go` 文件起步
+  例如：`internal/core/processor/token_split_test.go`、`internal/support/heuristic/text_test.go`
+- 当前问题不是“完全没有测试”，而是“测试仍然没有保护住主链”
 - 这意味着“能跑测试”不等于“关键链路已经被保护”
 
 当前风险不是单点风险，而是整条链路都缺少回归保护：
@@ -132,9 +134,13 @@ gRPC 服务集成测试重点：
 6. `internal/infra/summary` worker 的消费与写回集成测试
 7. 最小端到端冒烟测试
 
+如果下一步要同步推进 `Explain / dry-run / cache debug`，建议至少先完成前 1-3 项，
+先给 request mapping、摘要逻辑、配置校验加上最小护栏，再扩协议与调试语义。
+
 这样排序的原因：
 
 - 前三类成本低、收益高
+- 前三类也是 `dry_run / explain` 改动前最值得先锁住的契约
 - 中间三类能保护核心链路
 - 最后一类用于确认系统在真实运行形态下没有断裂
 
@@ -311,9 +317,10 @@ docker run --name context-refiner-redis-test -p 6379:6379 -d redis:7
 1. 先补 `internal/service/request_mapping.go` 与 `response_mapping.go`
 2. 再补 `internal/infra/summary/summarizer.go` 中的摘要逻辑
 3. 再补 `internal/infra/config/config.go` 与 `policy.go`
-4. 然后补 `internal/infra/store/redis/repository.go` 与 content-addressed key 相关测试
-5. 再补 `Refine` / `PageIn` 服务集成测试
-6. 最后补最小冒烟测试脚本或手工验证步骤
+4. 然后推进 `dry_run / explain / cache debug`，并为新增 metadata / 契约补断言
+5. 再补 `internal/infra/store/redis/repository.go` 与 content-addressed key 相关测试
+6. 再补 `Refine` / `PageIn` 服务集成测试
+7. 最后补最小冒烟测试脚本或手工验证步骤
 
 ## 13. 与其他文档的关系
 
@@ -328,7 +335,8 @@ docker run --name context-refiner-redis-test -p 6379:6379 -d redis:7
 当前最合理的测试建设路线，不是“先做一套很大很全的测试体系”，而是：
 
 1. 先补最小单测闭环
-2. 再补 Redis 与 gRPC 集成保护
-3. 最后再做真实环境冒烟验证
+2. 再带着测试护栏补 `Explain / dry-run / cache debug`
+3. 再补 Redis 与 gRPC 集成保护
+4. 最后再做真实环境冒烟验证
 
 这样能用最小成本，最快给当前主链建立回归护栏。

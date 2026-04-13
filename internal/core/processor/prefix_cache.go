@@ -127,7 +127,6 @@ func (p *PrefixCacheProcessor) Process(ctx context.Context, req *core.RefineRequ
 	updated.Metadata["prefix_cache_hot_score"] = strconv.FormatFloat(registration.Entry.HotScore, 'f', 0, 64)
 	updated.Metadata["prefix_cache_ttl_tier"] = registration.Entry.CacheTier
 	updated.Metadata["prefix_cache_applied_ttl_seconds"] = strconv.FormatInt(registration.Entry.AppliedTTLSeconds, 10)
-	updated.Metadata["downstream_kv_reuse_hint"] = "model+normalized-prefix"
 	return updated, core.ProcessResult{
 		Details: map[string]string{
 			"prefix_cache_lookup":         analysis.LookupResult,
@@ -136,7 +135,7 @@ func (p *PrefixCacheProcessor) Process(ctx context.Context, req *core.RefineRequ
 		},
 		Semantic: core.StepSemanticAudit{
 			Retained:            appendNonEmpty(nil, "stable_prefix_hash", "stable_prefix_tokens", "model_id", "segment_prefix_hashes", "miss_reason"),
-			Reasons:             appendNonEmpty(nil, "register_prompt_prefix_for_kv_reuse_hint", "diagnose_prefix_cache_miss"),
+			Reasons:             appendNonEmpty(nil, "register_application_prefix_identity", "diagnose_prefix_cache_miss"),
 			SourcePreserved:     true,
 			CodeFencePreserved:  true,
 			ErrorStackPreserved: true,
