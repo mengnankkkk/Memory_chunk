@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"context-refiner/internal/core"
+	"context-refiner/internal/domain/core"
 
 	"gopkg.in/yaml.v3"
 )

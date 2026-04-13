@@ -1,9 +1,9 @@
 package bootstrap
 
 import (
-	"context-refiner/internal/core"
-	"context-refiner/internal/core/processor"
-	"context-refiner/internal/core/repository"
+	"context-refiner/internal/domain/core"
+	"context-refiner/internal/domain/core/processor"
+	"context-refiner/internal/domain/core/repository"
 )
 
 func buildRegistry(counter core.TokenCounter, pageStore repository.PageRepository, summaryQueue repository.SummaryJobRepository, prefixStore repository.PrefixCacheRepository, prefixPolicy core.PrefixCachePolicy, pagingLimit int) *core.Registry {

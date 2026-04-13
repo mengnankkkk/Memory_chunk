@@ -107,7 +107,7 @@ Core Pipeline
 当前实现：
 
 - [api/refiner.proto](/E:/github/Memory_chunk/api/refiner.proto)
-- [internal/adapter/grpc/refiner_handler.go](/E:/github/Memory_chunk/internal/adapter/grpc/refiner_handler.go)
+- [internal/controller/grpc/refine_controller.go](/E:/github/Memory_chunk/internal/controller/grpc/refine_controller.go)
 
 ### 6.2 Application Service / Mapping 层
 
@@ -128,9 +128,9 @@ Core Pipeline
 当前实现：
 
 - [pkg/service/refiner.go](/E:/github/Memory_chunk/pkg/service/refiner.go)
-- [internal/service/refiner_service.go](/E:/github/Memory_chunk/internal/service/refiner_service.go)
-- [internal/service/request_mapping.go](/E:/github/Memory_chunk/internal/service/request_mapping.go)
-- [internal/service/response_mapping.go](/E:/github/Memory_chunk/internal/service/response_mapping.go)
+- [internal/service/refine_service.go](/E:/github/Memory_chunk/internal/service/refine_service.go)
+- [internal/mapper/refine_request_mapper.go](/E:/github/Memory_chunk/internal/mapper/refine_request_mapper.go)
+- [internal/mapper/refine_response_mapper.go](/E:/github/Memory_chunk/internal/mapper/refine_response_mapper.go)
 
 ### 6.3 Pipeline Engine 层
 
@@ -143,8 +143,8 @@ Core Pipeline
 
 当前实现：
 
-- [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go)
-- [internal/core/registry.go](/E:/github/Memory_chunk/internal/core/registry.go)
+- [internal/domain/core/pipeline.go](/E:/github/Memory_chunk/internal/domain/core/pipeline.go)
+- [internal/domain/core/registry.go](/E:/github/Memory_chunk/internal/domain/core/registry.go)
 
 ### 6.4 Processor 层
 
@@ -182,11 +182,11 @@ Core Pipeline
 
 当前实现：
 
-- [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go)
+- [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
 - [internal/observability/recorder.go](/E:/github/Memory_chunk/internal/observability/recorder.go)
-- [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
-- [internal/infra/summary/worker.go](/E:/github/Memory_chunk/internal/infra/summary/worker.go)
-- [internal/infra/observability/prometheus.go](/E:/github/Memory_chunk/internal/infra/observability/prometheus.go)
+- [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
+- [internal/adapter/outbound/summary/summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go)
+- [internal/observability/metrics/prometheus_recorder.go](/E:/github/Memory_chunk/internal/observability/metrics/prometheus_recorder.go)
 
 ### 6.6 Egress 层
 

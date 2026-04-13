@@ -7,17 +7,17 @@ import (
 	"log"
 	"net/http"
 
-	grpcadapter "context-refiner/internal/adapter/grpc"
-	"context-refiner/internal/core"
-	"context-refiner/internal/core/repository"
+	redisstore "context-refiner/internal/adapter/outbound/redis"
+	"context-refiner/internal/adapter/outbound/summary"
+	grpccontroller "context-refiner/internal/controller/grpc"
+	"context-refiner/internal/domain/core"
+	"context-refiner/internal/domain/core/repository"
 	"context-refiner/internal/infra/config"
-	promobs "context-refiner/internal/infra/observability"
-	redisstore "context-refiner/internal/infra/store/redis"
-	"context-refiner/internal/infra/summary"
-	"context-refiner/internal/infra/tokenizer"
-	apptracing "context-refiner/internal/infra/tracing"
 	"context-refiner/internal/observability"
+	metricsobs "context-refiner/internal/observability/metrics"
+	apptracing "context-refiner/internal/observability/tracing"
 	"context-refiner/internal/service"
+	"context-refiner/internal/support/tokenizer"
 
 	"google.golang.org/grpc"
 )
@@ -71,7 +71,7 @@ func LoadRuntime(ctx context.Context, configPath string) (*AppRuntime, error) {
 		policies,
 		cfg.Pipeline.DefaultPolicy,
 	)
-	grpcadapter.RegisterRefinerService(grpcServer, refinerService)
+	grpccontroller.RegisterRefinerService(grpcServer, refinerService)
 
 	return &AppRuntime{
 		Cfg:             cfg,
@@ -118,7 +118,7 @@ func newMetricsRuntime(cfg *config.AppConfig) (observability.Recorder, *http.Ser
 	if !cfg.Observability.MetricsEnabled {
 		return observability.NewNopRecorder(), nil, nil
 	}
-	recorder, err := promobs.NewPrometheusRecorder()
+	recorder, err := metricsobs.NewPrometheusRecorder()
 	if err != nil {
 		return nil, nil, fmt.Errorf("init prometheus recorder failed: %w", err)
 	}

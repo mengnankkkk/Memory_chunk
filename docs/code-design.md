@@ -1,7 +1,7 @@
 # Context Refiner 代码设计说明
 
-- 文档版本：`v2026.04.11`
-- 更新日期：`2026-04-11`
+- 文档版本：`v2026.04.13`
+- 更新日期：`2026-04-13`
 - 文档类型：`Code Reference`
 - 适用代码基线：`main`
 
@@ -36,23 +36,27 @@ docs/
 
 internal/
   adapter/
-    grpc/
+    outbound/
+      redis/
+      summary/
   bootstrap/
-  core/
-    repository/
-    processor/
-  observability/
+  controller/
+    grpc/
+  domain/
+    core/
+      processor/
+      repository/
+  dto/
   infra/
     config/
-    observability/
+  mapper/
+  observability/
+    metrics/
     tracing/
-    store/
-      redis/
-    summary/
-    tokenizer/
   service/
   support/
     heuristic/
+    tokenizer/
 
 pkg/
   client/
@@ -110,7 +114,7 @@ pkg/
 
 职责：
 
-- 装配 `infra -> core -> service -> adapter`
+- 装配 `infra/config -> adapter/outbound -> domain -> service -> controller`
 - 构建 registry、page store、gRPC server、summary worker
 - 把启动时依赖集中在一层，避免散落到 `main`
 
@@ -119,7 +123,7 @@ pkg/
 - [internal/bootstrap/runtime.go](/E:/github/Memory_chunk/internal/bootstrap/runtime.go)
 - [internal/bootstrap/processors.go](/E:/github/Memory_chunk/internal/bootstrap/processors.go)
 
-### 3.6 `internal/adapter/grpc/`
+### 3.6 `internal/controller/grpc/`
 
 职责：
 
@@ -129,7 +133,7 @@ pkg/
 
 关键文件：
 
-- [internal/adapter/grpc/refiner_handler.go](/E:/github/Memory_chunk/internal/adapter/grpc/refiner_handler.go)
+- [internal/controller/grpc/refine_controller.go](/E:/github/Memory_chunk/internal/controller/grpc/refine_controller.go)
 
 ### 3.7 `internal/service/`
 
@@ -141,12 +145,12 @@ pkg/
 
 关键文件：
 
-- [internal/service/refiner_service.go](/E:/github/Memory_chunk/internal/service/refiner_service.go)
-- [internal/service/request_mapping.go](/E:/github/Memory_chunk/internal/service/request_mapping.go)
-- [internal/service/response_mapping.go](/E:/github/Memory_chunk/internal/service/response_mapping.go)
-- [internal/service/mapping_helpers.go](/E:/github/Memory_chunk/internal/service/mapping_helpers.go)
+- [internal/service/refine_service.go](/E:/github/Memory_chunk/internal/service/refine_service.go)
+- [internal/mapper/refine_request_mapper.go](/E:/github/Memory_chunk/internal/mapper/refine_request_mapper.go)
+- [internal/mapper/refine_response_mapper.go](/E:/github/Memory_chunk/internal/mapper/refine_response_mapper.go)
+- [internal/mapper/mapper_helper.go](/E:/github/Memory_chunk/internal/mapper/mapper_helper.go)
 
-### 3.8 `internal/core/`
+### 3.8 `internal/domain/core/`
 
 职责：
 
@@ -157,10 +161,10 @@ pkg/
 
 关键文件：
 
-- [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go)
-- [internal/core/registry.go](/E:/github/Memory_chunk/internal/core/registry.go)
+- [internal/domain/core/pipeline.go](/E:/github/Memory_chunk/internal/domain/core/pipeline.go)
+- [internal/domain/core/registry.go](/E:/github/Memory_chunk/internal/domain/core/registry.go)
 
-### 3.9 `internal/core/repository/`
+### 3.9 `internal/domain/core/repository/`
 
 职责：
 
@@ -170,9 +174,9 @@ pkg/
 
 关键文件：
 
-- [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go)
+- [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
 
-### 3.10 `internal/core/processor/`
+### 3.10 `internal/domain/core/processor/`
 
 职责：
 
@@ -182,36 +186,44 @@ pkg/
 
 关键文件：
 
-- [internal/core/processor/request_clone.go](/E:/github/Memory_chunk/internal/core/processor/request_clone.go)
-- [internal/core/processor/token_split.go](/E:/github/Memory_chunk/internal/core/processor/token_split.go)
-- [internal/core/processor/chunk_metadata.go](/E:/github/Memory_chunk/internal/core/processor/chunk_metadata.go)
-- [internal/core/processor/paging.go](/E:/github/Memory_chunk/internal/core/processor/paging.go)
-- [internal/core/processor/collapse.go](/E:/github/Memory_chunk/internal/core/processor/collapse.go)
-- [internal/core/processor/compact.go](/E:/github/Memory_chunk/internal/core/processor/compact.go)
-- [internal/core/processor/canonicalize.go](/E:/github/Memory_chunk/internal/core/processor/canonicalize.go)
-- [internal/core/processor/structured.go](/E:/github/Memory_chunk/internal/core/processor/structured.go)
-- [internal/core/processor/snip.go](/E:/github/Memory_chunk/internal/core/processor/snip.go)
-- [internal/core/processor/auto.go](/E:/github/Memory_chunk/internal/core/processor/auto.go)
-- [internal/core/processor/assemble.go](/E:/github/Memory_chunk/internal/core/processor/assemble.go)
+- [internal/domain/core/processor/request_clone_helper.go](/E:/github/Memory_chunk/internal/domain/core/processor/request_clone_helper.go)
+- [internal/domain/core/processor/token_split_helper.go](/E:/github/Memory_chunk/internal/domain/core/processor/token_split_helper.go)
+- [internal/domain/core/processor/chunk_metadata_helper.go](/E:/github/Memory_chunk/internal/domain/core/processor/chunk_metadata_helper.go)
+- [internal/domain/core/processor/paging_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/paging_processor.go)
+- [internal/domain/core/processor/collapse_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/collapse_processor.go)
+- [internal/domain/core/processor/compact_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/compact_processor.go)
+- [internal/domain/core/processor/canonicalize_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/canonicalize_processor.go)
+- [internal/domain/core/processor/structured_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/structured_processors.go)
+- [internal/domain/core/processor/snip_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/snip_processor.go)
+- [internal/domain/core/processor/auto_compact_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/auto_compact_processor.go)
+- [internal/domain/core/processor/assemble_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/assemble_processor.go)
 
-### 3.11 `internal/infra/`
+### 3.11 `internal/adapter/outbound/`
 
 职责：
 
-- 承载外部依赖与技术实现
-- 当前包括配置加载、Redis repository implementation、summary worker、tokenizer
+- 承载面向外部系统的出站适配实现
+- 当前包括 Redis repository implementation 与 summary worker
+
+关键文件：
+
+- [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
+- [internal/adapter/outbound/summary/summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go)
+- [internal/adapter/outbound/summary/heuristic_summarizer.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/heuristic_summarizer.go)
+
+### 3.12 `internal/infra/config/`
+
+职责：
+
+- 负责配置加载、默认值填充与配置校验
+- 保持工程配置格式与业务主链解耦
 
 关键文件：
 
 - [internal/infra/config/config.go](/E:/github/Memory_chunk/internal/infra/config/config.go)
 - [internal/infra/config/policy.go](/E:/github/Memory_chunk/internal/infra/config/policy.go)
-- [internal/infra/observability/prometheus.go](/E:/github/Memory_chunk/internal/infra/observability/prometheus.go)
-- [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
-- [internal/infra/summary/worker.go](/E:/github/Memory_chunk/internal/infra/summary/worker.go)
-- [internal/infra/summary/summarizer.go](/E:/github/Memory_chunk/internal/infra/summary/summarizer.go)
-- [internal/infra/tokenizer/counter.go](/E:/github/Memory_chunk/internal/infra/tokenizer/counter.go)
 
-### 3.12 `internal/observability/`
+### 3.13 `internal/observability/`
 
 职责：
 
@@ -221,8 +233,10 @@ pkg/
 关键文件：
 
 - [internal/observability/recorder.go](/E:/github/Memory_chunk/internal/observability/recorder.go)
+- [internal/observability/metrics/prometheus_recorder.go](/E:/github/Memory_chunk/internal/observability/metrics/prometheus_recorder.go)
+- [internal/observability/tracing/provider.go](/E:/github/Memory_chunk/internal/observability/tracing/provider.go)
 
-### 3.13 `internal/support/`
+### 3.14 `internal/support/`
 
 职责：
 
@@ -242,10 +256,10 @@ pkg/
 - `api/` 是外部协议边界
 - `pkg/service/` 是公开服务接口
 - `internal/service/` 是应用服务实现
-- `internal/core/` 是核心业务内核
-- `internal/core/repository/` 是持久化契约边界
-- `internal/infra/` 是底层实现细节
-- `internal/adapter/grpc/` 是 transport adapter
+- `internal/domain/core/` 是核心业务内核
+- `internal/domain/core/repository/` 是持久化契约边界
+- `internal/adapter/outbound/` 是底层实现细节
+- `internal/controller/grpc/` 是 transport adapter
 
 这样做的直接结果是：
 
@@ -283,7 +297,7 @@ type RefinerService interface {
 
 对应代码：
 
-- [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go)
+- [internal/domain/core/pipeline.go](/E:/github/Memory_chunk/internal/domain/core/pipeline.go)
 
 ### 5.3 `Registry`
 
@@ -294,7 +308,7 @@ type RefinerService interface {
 
 对应代码：
 
-- [internal/core/registry.go](/E:/github/Memory_chunk/internal/core/registry.go)
+- [internal/domain/core/registry.go](/E:/github/Memory_chunk/internal/domain/core/registry.go)
 - [internal/bootstrap/processors.go](/E:/github/Memory_chunk/internal/bootstrap/processors.go)
 
 ### 5.4 `PageRepository / SummaryJobRepository`
@@ -307,11 +321,11 @@ type RefinerService interface {
 
 仓储契约位于：
 
-- [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go)
+- [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
 
 当前 Redis 实现位于：
 
-- [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
+- [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
 
 ## 6. 请求主链
 
@@ -319,12 +333,12 @@ type RefinerService interface {
 
 代码主链：
 
-1. gRPC 请求进入 [internal/adapter/grpc/refiner_handler.go](/E:/github/Memory_chunk/internal/adapter/grpc/refiner_handler.go)
+1. gRPC 请求进入 [internal/controller/grpc/refine_controller.go](/E:/github/Memory_chunk/internal/controller/grpc/refine_controller.go)
 2. handler 委托给 [pkg/service/refiner.go](/E:/github/Memory_chunk/pkg/service/refiner.go) 定义的 service interface
-3. [internal/service/refiner_service.go](/E:/github/Memory_chunk/internal/service/refiner_service.go) 解析 policy
-4. [internal/service/request_mapping.go](/E:/github/Memory_chunk/internal/service/request_mapping.go) 把 protobuf request 映射成内部模型
-5. [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go) 执行 processor chain
-6. [internal/service/response_mapping.go](/E:/github/Memory_chunk/internal/service/response_mapping.go) 把内部结果映射回 protobuf response
+3. [internal/service/refine_service.go](/E:/github/Memory_chunk/internal/service/refine_service.go) 解析 policy
+4. [internal/mapper/refine_request_mapper.go](/E:/github/Memory_chunk/internal/mapper/refine_request_mapper.go) 把 protobuf request 收敛为 dto 并继续映射成内部模型
+5. [internal/domain/core/pipeline.go](/E:/github/Memory_chunk/internal/domain/core/pipeline.go) 执行 processor chain
+6. [internal/mapper/refine_response_mapper.go](/E:/github/Memory_chunk/internal/mapper/refine_response_mapper.go) 把内部结果映射回 protobuf response
 7. gRPC 返回 `RefineResponse`
 
 ### 6.2 `PageIn`
@@ -333,7 +347,7 @@ type RefinerService interface {
 
 1. gRPC 请求进入 adapter
 2. service 层校验并遍历 `page_keys`
-3. 通过 [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go) 定义的 `PageRepository` 优先读取 summary，底层当前由 [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go) 实现
+3. 通过 [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go) 定义的 `PageRepository` 优先读取 summary，底层当前由 [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go) 实现
 4. service 层组装 `PageInResponse`
 
 ## 7. Processor 设计
@@ -358,13 +372,13 @@ type RefinerService interface {
 
 相关代码：
 
-- [internal/core/processor/paging.go](/E:/github/Memory_chunk/internal/core/processor/paging.go)
-- [internal/core/processor/collapse.go](/E:/github/Memory_chunk/internal/core/processor/collapse.go)
-- [internal/core/processor/structured.go](/E:/github/Memory_chunk/internal/core/processor/structured.go)
-- [internal/core/processor/auto.go](/E:/github/Memory_chunk/internal/core/processor/auto.go)
-- [internal/core/processor/assemble.go](/E:/github/Memory_chunk/internal/core/processor/assemble.go)
+- [internal/domain/core/processor/paging_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/paging_processor.go)
+- [internal/domain/core/processor/collapse_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/collapse_processor.go)
+- [internal/domain/core/processor/structured_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/structured_processors.go)
+- [internal/domain/core/processor/auto_compact_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/auto_compact_processor.go)
+- [internal/domain/core/processor/assemble_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/assemble_processor.go)
 
-## 8. Infra 设计
+## 8. 基础设施与适配层设计
 
 ### 8.1 配置
 
@@ -379,7 +393,7 @@ type RefinerService interface {
 
 对应代码：
 
-- [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
+- [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
 
 ### 8.3 Summary Worker
 
@@ -389,22 +403,23 @@ type RefinerService interface {
 
 对应代码：
 
-- [internal/infra/summary/worker.go](/E:/github/Memory_chunk/internal/infra/summary/worker.go)
-- [internal/infra/summary/summarizer.go](/E:/github/Memory_chunk/internal/infra/summary/summarizer.go)
+- [internal/adapter/outbound/summary/summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go)
+- [internal/adapter/outbound/summary/heuristic_summarizer.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/heuristic_summarizer.go)
 
 ### 8.4 Tokenizer
 
 - 对外只暴露统一计数能力
-- 当前底层实现封装在 infra 层
+- 当前底层实现封装在 support 层的独立 tokenizer 包中
 
 对应代码：
 
-- [internal/infra/tokenizer/counter.go](/E:/github/Memory_chunk/internal/infra/tokenizer/counter.go)
+- [internal/support/tokenizer/token_counter.go](/E:/github/Memory_chunk/internal/support/tokenizer/token_counter.go)
 
 ### 8.5 Observability
 
 - `internal/observability` 定义 recorder contract
-- `internal/infra/observability` 提供 Prometheus 实现
+- `internal/observability/metrics` 提供 Prometheus 实现
+- `internal/observability/tracing` 提供 tracing provider
 - runtime 会额外启动一个独立的 metrics HTTP server
 - 当前指标重点覆盖 `refine/pagein`、pipeline step、token、stable prefix、page reuse、summary job
 
@@ -414,7 +429,7 @@ type RefinerService interface {
 
 推荐步骤：
 
-1. 在 [internal/core/processor](/E:/github/Memory_chunk/internal/core/processor) 新增实现
+1. 在 [internal/domain/core/processor](/E:/github/Memory_chunk/internal/domain/core/processor) 新增实现
 2. 实现 `Descriptor()` 与 `Process()`
 3. 在 [internal/bootstrap/processors.go](/E:/github/Memory_chunk/internal/bootstrap/processors.go) 注册
 4. 在 `config/policies.yaml` 中编排 step
@@ -425,8 +440,8 @@ type RefinerService interface {
 推荐方式：
 
 1. 保持 `pkg/service.RefinerService` 不变
-2. 新增一个 adapter 包，例如 `internal/adapter/http`
-3. 把请求解析与响应回写限制在 adapter 层
+2. 新增一个 controller 包，例如 `internal/controller/http`
+3. 把请求解析与响应回写限制在 controller 层
 4. 不把业务逻辑回塞到 transport handler
 
 ### 9.3 强化 SDK / Client
@@ -443,13 +458,13 @@ type RefinerService interface {
 1. [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md)
 2. [cmd/refiner/main.go](/E:/github/Memory_chunk/cmd/refiner/main.go)
 3. [internal/bootstrap/runtime.go](/E:/github/Memory_chunk/internal/bootstrap/runtime.go)
-4. [internal/adapter/grpc/refiner_handler.go](/E:/github/Memory_chunk/internal/adapter/grpc/refiner_handler.go)
-5. [internal/service/refiner_service.go](/E:/github/Memory_chunk/internal/service/refiner_service.go)
-6. [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go)
-7. [internal/core/processor/paging.go](/E:/github/Memory_chunk/internal/core/processor/paging.go)
-8. [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go)
-9. [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
-10. [internal/infra/summary/worker.go](/E:/github/Memory_chunk/internal/infra/summary/worker.go)
+4. [internal/controller/grpc/refine_controller.go](/E:/github/Memory_chunk/internal/controller/grpc/refine_controller.go)
+5. [internal/service/refine_service.go](/E:/github/Memory_chunk/internal/service/refine_service.go)
+6. [internal/domain/core/pipeline.go](/E:/github/Memory_chunk/internal/domain/core/pipeline.go)
+7. [internal/domain/core/processor/paging_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/paging_processor.go)
+8. [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
+9. [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
+10. [internal/adapter/outbound/summary/summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go)
 
 ## 11. 当前设计判断
 

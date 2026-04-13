@@ -75,11 +75,11 @@
 
 读：
 
-- [internal/adapter/grpc/refiner_handler.go](/E:/github/Memory_chunk/internal/adapter/grpc/refiner_handler.go)
+- [internal/controller/grpc/refine_controller.go](/E:/github/Memory_chunk/internal/controller/grpc/refine_controller.go)
 - [pkg/service/refiner.go](/E:/github/Memory_chunk/pkg/service/refiner.go)
-- [internal/service/refiner_service.go](/E:/github/Memory_chunk/internal/service/refiner_service.go)
-- [internal/service/request_mapping.go](/E:/github/Memory_chunk/internal/service/request_mapping.go)
-- [internal/service/response_mapping.go](/E:/github/Memory_chunk/internal/service/response_mapping.go)
+- [internal/service/refine_service.go](/E:/github/Memory_chunk/internal/service/refine_service.go)
+- [internal/mapper/refine_request_mapper.go](/E:/github/Memory_chunk/internal/mapper/refine_request_mapper.go)
+- [internal/mapper/refine_response_mapper.go](/E:/github/Memory_chunk/internal/mapper/refine_response_mapper.go)
 
 要重点看：
 
@@ -94,8 +94,8 @@
 
 读：
 
-- [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go)
-- [internal/core/registry.go](/E:/github/Memory_chunk/internal/core/registry.go)
+- [internal/domain/core/pipeline.go](/E:/github/Memory_chunk/internal/domain/core/pipeline.go)
+- [internal/domain/core/registry.go](/E:/github/Memory_chunk/internal/domain/core/registry.go)
 
 你需要理解：
 
@@ -107,10 +107,10 @@
 
 读：
 
-- [internal/core/processor/paging.go](/E:/github/Memory_chunk/internal/core/processor/paging.go)
-- [internal/core/processor/collapse.go](/E:/github/Memory_chunk/internal/core/processor/collapse.go)
-- [internal/core/processor/structured.go](/E:/github/Memory_chunk/internal/core/processor/structured.go)
-- [internal/core/processor/auto.go](/E:/github/Memory_chunk/internal/core/processor/auto.go)
+- [internal/domain/core/processor/paging_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/paging_processor.go)
+- [internal/domain/core/processor/collapse_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/collapse_processor.go)
+- [internal/domain/core/processor/structured_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/structured_processors.go)
+- [internal/domain/core/processor/auto_compact_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/auto_compact_processor.go)
 - [internal/support/heuristic/extract.go](/E:/github/Memory_chunk/internal/support/heuristic/extract.go)
 
 学习时不要只看“做了什么”，还要看“为什么这一类逻辑被拆成独立 Processor”。
@@ -119,9 +119,9 @@
 
 读：
 
-- [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go)
-- [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
-- [internal/infra/summary/worker.go](/E:/github/Memory_chunk/internal/infra/summary/worker.go)
+- [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
+- [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
+- [internal/adapter/outbound/summary/summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go)
 - [internal/infra/config/config.go](/E:/github/Memory_chunk/internal/infra/config/config.go)
 
 你要理解：
@@ -138,10 +138,10 @@
 1. [docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
 2. [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md)
 3. [cmd/refiner/main.go](/E:/github/Memory_chunk/cmd/refiner/main.go)
-4. [internal/service/refiner_service.go](/E:/github/Memory_chunk/internal/service/refiner_service.go)
-5. [internal/core/pipeline.go](/E:/github/Memory_chunk/internal/core/pipeline.go)
-6. [internal/core/repository/repository.go](/E:/github/Memory_chunk/internal/core/repository/repository.go)
-7. [internal/infra/store/redis/repository.go](/E:/github/Memory_chunk/internal/infra/store/redis/repository.go)
+4. [internal/service/refine_service.go](/E:/github/Memory_chunk/internal/service/refine_service.go)
+5. [internal/domain/core/pipeline.go](/E:/github/Memory_chunk/internal/domain/core/pipeline.go)
+6. [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
+7. [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
 
 这样至少能理解主干。
 
