@@ -17,6 +17,7 @@ import (
 type Worker struct {
 	consumer     repository.SummaryJobConsumer
 	pageStore    repository.PageRepository
+	provider     Provider
 	metrics      observability.Recorder
 	group        string
 	consumerName string
@@ -24,10 +25,14 @@ type Worker struct {
 	blockTimeout time.Duration
 }
 
-func NewWorker(consumer repository.SummaryJobConsumer, pageStore repository.PageRepository, metrics observability.Recorder, group string, consumerName string, batchSize int64, blockTimeout time.Duration) *Worker {
+func NewWorker(consumer repository.SummaryJobConsumer, pageStore repository.PageRepository, provider Provider, metrics observability.Recorder, group string, consumerName string, batchSize int64, blockTimeout time.Duration) *Worker {
+	if provider == nil {
+		provider = NewHeuristicProvider()
+	}
 	return &Worker{
 		consumer:     consumer,
 		pageStore:    pageStore,
+		provider:     provider,
 		metrics:      defaultMetrics(metrics),
 		group:        defaultSummaryGroup(group),
 		consumerName: defaultConsumerName(consumerName),
@@ -101,15 +106,18 @@ func (w *Worker) handleJob(ctx context.Context, message repository.SummaryJobMes
 		attribute.String("summary.job_id", message.Job.JobID),
 		attribute.String("summary.chunk_id", message.Job.ChunkID),
 		attribute.Int("summary.page_ref_count", len(message.Job.PageRefs)),
+		attribute.String("summary.provider", w.provider.Name()),
+		attribute.String("summary.provider_version", w.provider.Version()),
 	)
 
-	result := repository.SummaryResult{
-		JobID:     message.Job.JobID,
-		Content:   summarizeJob(message.Job),
-		CreatedAt: time.Now().UTC(),
+	artifact, err := w.provider.Summarize(ctx, message.Job)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(otelcodes.Error, err.Error())
+		return fmt.Errorf("summarize job failed: %w", err)
 	}
 	for _, pageRef := range message.Job.PageRefs {
-		if err := w.pageStore.SaveSummary(ctx, pageRef, result); err != nil {
+		if err := w.pageStore.SaveSummary(ctx, pageRef, artifact); err != nil {
 			span.RecordError(err)
 			span.SetStatus(otelcodes.Error, err.Error())
 			return fmt.Errorf("save summary result failed: %w", err)

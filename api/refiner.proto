@@ -4,6 +4,8 @@ package refiner.v1;
 
 option go_package = "context-refiner/api/refinerv1;refinerv1";
 
+import "google/protobuf/timestamp.proto";
+
 message Message {
   string role = 1;
   string content = 2;
@@ -100,11 +102,31 @@ message PageInRequest {
   repeated string page_keys = 1;
 }
 
+message SummaryArtifact {
+  string artifact_id = 1;
+  string job_id = 2;
+  string session_id = 3;
+  string request_id = 4;
+  string policy = 5;
+  string chunk_id = 6;
+  string source = 7;
+  repeated string page_refs = 8;
+  string content_hash = 9;
+  string summary_text = 10;
+  repeated string fragment_types = 11;
+  string provider = 12;
+  string provider_version = 13;
+  string schema_version = 14;
+  google.protobuf.Timestamp created_at = 15;
+  google.protobuf.Timestamp expires_at = 16;
+}
+
 message StoredPage {
   string key = 1;
   string content = 2;
   bool is_summary = 3;
   string summary_job_id = 4;
+  SummaryArtifact summary_artifact = 5;
 }
 
 message PageInResponse {

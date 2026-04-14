@@ -186,18 +186,31 @@
 
 当前是启发式规则，不是真实 LLM Provider。
 
-### 7.2 存储层还不稳定
+### 7.2 存储层正在收敛，但还没走完
 
-当前 summary 更像 page key 的附属字符串，而不是独立摘要对象。
+当前 summary 已经从“page key 的附属字符串”升级成结构化 `SummaryArtifact`，并带上：
+
+- `artifact_id`
+- `content_hash`
+- `fragment_types`
+- `provider / provider_version`
+- `schema_version`
+- `created_at / expires_at`
+
+但它还没有完全演进成独立摘要子系统，当前仍然：
+
+- 主要挂载在 page key 下读取
+- 还没有 chunk 级独立索引
+- 还没有多 provider 并存与切换策略
 
 ### 7.3 生命周期管理还不稳定
 
-当前缺少：
+当前仍缺少：
 
-- provider 版本管理
-- 内容变化失效策略
-- 重试策略
-- 更细粒度的索引
+- 真实外部 summary provider
+- worker retry / claim 策略
+- chunk 级独立摘要索引
+- 更细粒度的摘要生命周期治理
 
 所以当前 summary 的价值是“把架子搭起来了”，不是“最终方案已经确定了”。
 

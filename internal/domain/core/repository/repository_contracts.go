@@ -2,14 +2,22 @@ package repository
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"time"
+)
+
+const (
+	SummaryArtifactSchemaVersionV1    = "summary-artifact-v1"
+	SummaryProviderHeuristic          = "heuristic"
+	SummaryProviderVersionHeuristicV1 = "heuristic-v1"
 )
 
 type PageRepository interface {
 	SavePage(ctx context.Context, key string, content string) error
 	LoadPage(ctx context.Context, key string) (string, error)
 	LoadResolvedPage(ctx context.Context, key string) (ResolvedPage, error)
-	SaveSummary(ctx context.Context, key string, result SummaryResult) error
+	SaveSummary(ctx context.Context, key string, artifact SummaryArtifact) error
 }
 
 type SummaryJobRepository interface {
@@ -88,15 +96,49 @@ type SummaryJobMessage struct {
 	Job SummaryJob
 }
 
-type SummaryResult struct {
-	JobID     string    `json:"job_id"`
-	Content   string    `json:"content"`
-	CreatedAt time.Time `json:"created_at"`
+type SummaryArtifact struct {
+	ArtifactID      string    `json:"artifact_id"`
+	JobID           string    `json:"job_id"`
+	SessionID       string    `json:"session_id,omitempty"`
+	RequestID       string    `json:"request_id,omitempty"`
+	Policy          string    `json:"policy,omitempty"`
+	ChunkID         string    `json:"chunk_id,omitempty"`
+	Source          string    `json:"source,omitempty"`
+	PageRefs        []string  `json:"page_refs,omitempty"`
+	ContentHash     string    `json:"content_hash"`
+	SummaryText     string    `json:"summary_text"`
+	FragmentTypes   []string  `json:"fragment_types,omitempty"`
+	Provider        string    `json:"provider"`
+	ProviderVersion string    `json:"provider_version"`
+	SchemaVersion   string    `json:"schema_version"`
+	CreatedAt       time.Time `json:"created_at"`
+	ExpiresAt       time.Time `json:"expires_at,omitempty"`
 }
 
 type ResolvedPage struct {
-	Key          string
-	Content      string
-	IsSummary    bool
-	SummaryJobID string
+	Key             string
+	Content         string
+	IsSummary       bool
+	SummaryJobID    string
+	SummaryArtifact *SummaryArtifact
+}
+
+func BuildSummaryArtifactID(contentHash string, provider string, providerVersion string) string {
+	parts := make([]string, 0, 4)
+	for _, value := range []string{
+		"summary",
+		SummaryArtifactSchemaVersionV1,
+		strings.TrimSpace(provider),
+		strings.TrimSpace(providerVersion),
+		strings.TrimSpace(contentHash),
+	} {
+		if value == "" {
+			continue
+		}
+		parts = append(parts, value)
+	}
+	if len(parts) == 0 {
+		return "summary"
+	}
+	return fmt.Sprintf("%s", strings.Join(parts, ":"))
 }

@@ -148,17 +148,20 @@ func (r *RedisRepository) LoadResolvedPage(ctx context.Context, key string) (rep
 	defer span.End()
 	span.SetAttributes(attribute.String("page.key", key))
 
-	if result, err := r.loadSummary(ctx, key); err == nil {
+	if artifact, err := r.loadSummaryArtifact(ctx, key); err == nil {
 		span.SetAttributes(
 			attribute.String("page.resolve_result", "summary"),
-			attribute.String("summary.job_id", result.JobID),
+			attribute.String("summary.job_id", artifact.JobID),
+			attribute.String("summary.provider", artifact.Provider),
+			attribute.String("summary.provider_version", artifact.ProviderVersion),
 		)
 		r.metrics.ObserveStoreLoad("summary")
 		return repository.ResolvedPage{
-			Key:          key,
-			Content:      result.Content,
-			IsSummary:    true,
-			SummaryJobID: result.JobID,
+			Key:             key,
+			Content:         artifact.SummaryText,
+			IsSummary:       true,
+			SummaryJobID:    artifact.JobID,
+			SummaryArtifact: &artifact,
 		}, nil
 	}
 	value, err := r.client.Get(ctx, r.prefixed(key)).Result()
@@ -183,27 +186,30 @@ func (r *RedisRepository) LoadResolvedPage(ctx context.Context, key string) (rep
 	)
 	r.metrics.ObserveStoreLoad("page")
 	return repository.ResolvedPage{
-		Key:       key,
-		Content:   value,
-		IsSummary: false,
+		Key:             key,
+		Content:         value,
+		IsSummary:       false,
+		SummaryArtifact: nil,
 	}, nil
 }
 
-func (r *RedisRepository) SaveSummary(ctx context.Context, key string, result repository.SummaryResult) error {
+func (r *RedisRepository) SaveSummary(ctx context.Context, key string, artifact repository.SummaryArtifact) error {
 	ctx, span := otel.Tracer("context-refiner/infra/store/redis").Start(ctx, "redis.save_summary")
 	defer span.End()
-	span.SetAttributes(
-		attribute.String("page.key", key),
-		attribute.String("summary.job_id", result.JobID),
-	)
-
-	payload, err := json.Marshal(result)
+	normalized, err := r.prepareSummaryArtifact(key, artifact, time.Now().UTC())
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(otelcodes.Error, err.Error())
-		return fmt.Errorf("marshal summary result failed: %w", err)
+		return err
 	}
-	if err := r.client.Set(ctx, r.summaryKey(key), payload, r.pageTTL).Err(); err != nil {
+	span.SetAttributes(
+		attribute.String("page.key", key),
+		attribute.String("summary.job_id", normalized.JobID),
+		attribute.String("summary.content_hash", normalized.ContentHash),
+		attribute.String("summary.provider", normalized.Provider),
+		attribute.String("summary.provider_version", normalized.ProviderVersion),
+	)
+	if err := r.persistSummaryArtifact(ctx, key, normalized); err != nil {
 		span.RecordError(err)
 		span.SetStatus(otelcodes.Error, err.Error())
 		return err
@@ -433,16 +439,25 @@ func (r *RedisRepository) prefixSessionKey(scope string) string {
 	return r.keyPrefix + ":prefix-session:" + scope
 }
 
-func (r *RedisRepository) loadSummary(ctx context.Context, key string) (repository.SummaryResult, error) {
+func (r *RedisRepository) loadSummaryArtifact(ctx context.Context, key string) (repository.SummaryArtifact, error) {
 	value, err := r.client.Get(ctx, r.summaryKey(key)).Result()
 	if err != nil {
-		return repository.SummaryResult{}, err
+		return repository.SummaryArtifact{}, err
 	}
-	var result repository.SummaryResult
-	if err := json.Unmarshal([]byte(value), &result); err != nil {
-		return repository.SummaryResult{}, err
+	now := time.Now().UTC()
+	artifact, migrated, err := r.decodeSummaryArtifact(key, value, now)
+	if err != nil {
+		_ = r.client.Del(ctx, r.summaryKey(key)).Err()
+		return repository.SummaryArtifact{}, err
 	}
-	return result, nil
+	if migrated {
+		_ = r.persistSummaryArtifact(ctx, key, artifact)
+	}
+	if reason, valid := r.validateSummaryArtifact(key, artifact, now); !valid {
+		_ = r.client.Del(ctx, r.summaryKey(key)).Err()
+		return repository.SummaryArtifact{}, fmt.Errorf("summary artifact invalidated: %s", reason)
+	}
+	return artifact, nil
 }
 
 func (r *RedisRepository) loadPrefixEntry(ctx context.Context, key string) (repository.PrefixCacheEntry, bool, error) {
@@ -518,4 +533,147 @@ func defaultMetrics(recorder observability.Recorder) observability.Recorder {
 		return observability.NewNopRecorder()
 	}
 	return recorder
+}
+
+type legacySummaryPayload struct {
+	JobID     string    `json:"job_id"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (r *RedisRepository) prepareSummaryArtifact(pageKey string, artifact repository.SummaryArtifact, now time.Time) (repository.SummaryArtifact, error) {
+	artifact.SummaryText = strings.TrimSpace(artifact.SummaryText)
+	if artifact.SummaryText == "" {
+		return repository.SummaryArtifact{}, fmt.Errorf("summary text is required")
+	}
+	if artifact.CreatedAt.IsZero() {
+		artifact.CreatedAt = now
+	}
+	if strings.TrimSpace(artifact.ContentHash) == "" {
+		artifact.ContentHash = contentHashFromPageKey(pageKey)
+	}
+	expectedHash := contentHashFromPageKey(pageKey)
+	if expectedHash != "" && artifact.ContentHash != "" && artifact.ContentHash != expectedHash {
+		return repository.SummaryArtifact{}, fmt.Errorf("summary content hash mismatch for page key %s", pageKey)
+	}
+	if strings.TrimSpace(artifact.SchemaVersion) == "" {
+		artifact.SchemaVersion = repository.SummaryArtifactSchemaVersionV1
+	}
+	if strings.TrimSpace(artifact.Provider) == "" {
+		artifact.Provider = repository.SummaryProviderHeuristic
+	}
+	if strings.TrimSpace(artifact.ProviderVersion) == "" {
+		artifact.ProviderVersion = repository.SummaryProviderVersionHeuristicV1
+	}
+	if strings.TrimSpace(artifact.ArtifactID) == "" {
+		artifact.ArtifactID = repository.BuildSummaryArtifactID(artifact.ContentHash, artifact.Provider, artifact.ProviderVersion)
+	}
+	if artifact.ExpiresAt.IsZero() && r.pageTTL > 0 {
+		artifact.ExpiresAt = artifact.CreatedAt.Add(r.pageTTL)
+	}
+	artifact.PageRefs = appendUnique(pageKey, artifact.PageRefs...)
+	artifact.FragmentTypes = appendUnique("", artifact.FragmentTypes...)
+	return artifact, nil
+}
+
+func (r *RedisRepository) persistSummaryArtifact(ctx context.Context, key string, artifact repository.SummaryArtifact) error {
+	payload, err := json.Marshal(artifact)
+	if err != nil {
+		return fmt.Errorf("marshal summary artifact failed: %w", err)
+	}
+	if err := r.client.Set(ctx, r.summaryKey(key), payload, r.pageTTL).Err(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *RedisRepository) decodeSummaryArtifact(pageKey string, payload string, now time.Time) (repository.SummaryArtifact, bool, error) {
+	var artifact repository.SummaryArtifact
+	if err := json.Unmarshal([]byte(payload), &artifact); err != nil {
+		return repository.SummaryArtifact{}, false, fmt.Errorf("unmarshal summary artifact failed: %w", err)
+	}
+	if strings.TrimSpace(artifact.SummaryText) != "" {
+		normalized, err := r.prepareSummaryArtifact(pageKey, artifact, now)
+		return normalized, false, err
+	}
+	var legacy legacySummaryPayload
+	if err := json.Unmarshal([]byte(payload), &legacy); err != nil {
+		return repository.SummaryArtifact{}, false, fmt.Errorf("unmarshal legacy summary payload failed: %w", err)
+	}
+	if strings.TrimSpace(legacy.Content) == "" {
+		return repository.SummaryArtifact{}, false, fmt.Errorf("empty legacy summary payload")
+	}
+	migrated := repository.SummaryArtifact{
+		ArtifactID:      repository.BuildSummaryArtifactID(contentHashFromPageKey(pageKey), repository.SummaryProviderHeuristic, repository.SummaryProviderVersionHeuristicV1),
+		JobID:           strings.TrimSpace(legacy.JobID),
+		PageRefs:        []string{pageKey},
+		ContentHash:     contentHashFromPageKey(pageKey),
+		SummaryText:     strings.TrimSpace(legacy.Content),
+		Provider:        repository.SummaryProviderHeuristic,
+		ProviderVersion: repository.SummaryProviderVersionHeuristicV1,
+		SchemaVersion:   repository.SummaryArtifactSchemaVersionV1,
+		CreatedAt:       legacy.CreatedAt,
+	}
+	if strings.TrimSpace(migrated.JobID) == "" {
+		migrated.JobID = "summary-" + migrated.ContentHash
+	}
+	normalized, err := r.prepareSummaryArtifact(pageKey, migrated, now)
+	return normalized, true, err
+}
+
+func (r *RedisRepository) validateSummaryArtifact(pageKey string, artifact repository.SummaryArtifact, now time.Time) (string, bool) {
+	if strings.TrimSpace(artifact.SummaryText) == "" {
+		return "empty_summary_text", false
+	}
+	if strings.TrimSpace(artifact.SchemaVersion) != repository.SummaryArtifactSchemaVersionV1 {
+		return "schema_version_changed", false
+	}
+	expectedHash := contentHashFromPageKey(pageKey)
+	if expectedHash != "" && strings.TrimSpace(artifact.ContentHash) == "" {
+		return "content_hash_missing", false
+	}
+	if expectedHash != "" && strings.TrimSpace(artifact.ContentHash) != expectedHash {
+		return "content_hash_changed", false
+	}
+	if strings.TrimSpace(artifact.Provider) == "" {
+		return "provider_missing", false
+	}
+	if artifact.Provider == repository.SummaryProviderHeuristic && strings.TrimSpace(artifact.ProviderVersion) != repository.SummaryProviderVersionHeuristicV1 {
+		return "provider_version_changed", false
+	}
+	if !artifact.ExpiresAt.IsZero() && !now.Before(artifact.ExpiresAt) {
+		return "summary_expired", false
+	}
+	return "", true
+}
+
+func contentHashFromPageKey(key string) string {
+	const hashMarker = ":hash:"
+	const pageMarker = ":page:"
+	start := strings.Index(key, hashMarker)
+	if start < 0 {
+		return ""
+	}
+	remainder := key[start+len(hashMarker):]
+	if end := strings.Index(remainder, pageMarker); end >= 0 {
+		return remainder[:end]
+	}
+	return remainder
+}
+
+func appendUnique(first string, values ...string) []string {
+	seen := make(map[string]struct{}, len(values)+1)
+	out := make([]string, 0, len(values)+1)
+	for _, value := range append([]string{first}, values...) {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		out = append(out, trimmed)
+	}
+	return out
 }

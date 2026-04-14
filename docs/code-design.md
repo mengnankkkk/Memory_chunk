@@ -349,6 +349,7 @@ type RefinerService interface {
 2. service 层校验并遍历 `page_keys`
 3. 通过 [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go) 定义的 `PageRepository` 优先读取 summary，底层当前由 [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go) 实现
 4. service 层组装 `PageInResponse`
+5. `StoredPage` 在保持 `content / is_summary / summary_job_id` 兼容字段的同时，额外返回结构化 `summary_artifact`
 
 ## 7. Processor 设计
 
@@ -388,8 +389,9 @@ type RefinerService interface {
 ### 8.2 Redis Store
 
 - page 内容优先按 content-addressed artifact key 存储
-- summary 结果优先回填
+- summary artifact 优先回填
 - summary queue 基于 Redis Stream
+- 读取 summary artifact 时会执行 `content_hash / schema_version / provider_version / expires_at` 校验，不合法则删除并回退原 page
 
 对应代码：
 
@@ -398,8 +400,8 @@ type RefinerService interface {
 ### 8.3 Summary Worker
 
 - 从 queue 消费 summary job
-- 对 page refs 生成启发式摘要
-- 把摘要写回 store
+- 通过 `SummaryProvider` 生成启发式结构化 `SummaryArtifact`
+- 把 artifact 写回 store，并在读取时执行版本/TTL/内容哈希失效校验
 
 对应代码：
 
@@ -478,7 +480,7 @@ type RefinerService interface {
 
 当前仍存在的约束：
 
-- summary 仍是启发式逻辑，不是独立 provider 体系
+- summary 当前已有 `SummaryProvider` 抽象，但只有启发式 provider，一对多 provider 体系尚未完成
 - repository 目前仍由一个 Redis 实现同时承载 page 与 summary queue
 - 观测、评测、测试覆盖还不完整
 - 当前应用层已做 cache-aware 稳定化，但 KV 容量 / 淘汰 / 量化仍依赖下游 serving engine

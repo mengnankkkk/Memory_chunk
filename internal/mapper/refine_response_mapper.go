@@ -4,6 +4,8 @@ import (
 	refinerv1 "context-refiner/api/refinerv1"
 	"context-refiner/internal/domain/core"
 	"context-refiner/internal/dto"
+
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func MapRefineDomainResponseToDTO(resp *core.RefineResponse) *dto.RefineResponse {
@@ -36,13 +38,43 @@ func MapPageInDTOToProtoResponse(resp *dto.PageInResponse) *refinerv1.PageInResp
 	pages := make([]*refinerv1.StoredPage, 0, len(resp.Pages))
 	for _, item := range resp.Pages {
 		pages = append(pages, &refinerv1.StoredPage{
-			Key:          item.Key,
-			Content:      item.Content,
-			IsSummary:    item.IsSummary,
-			SummaryJobId: item.SummaryJobID,
+			Key:             item.Key,
+			Content:         item.Content,
+			IsSummary:       item.IsSummary,
+			SummaryJobId:    item.SummaryJobID,
+			SummaryArtifact: mapDTOSummaryArtifact(item.SummaryArtifact),
 		})
 	}
 	return &refinerv1.PageInResponse{Pages: pages}
+}
+
+func mapDTOSummaryArtifact(item *dto.SummaryArtifact) *refinerv1.SummaryArtifact {
+	if item == nil {
+		return nil
+	}
+	out := &refinerv1.SummaryArtifact{
+		ArtifactId:      item.ArtifactID,
+		JobId:           item.JobID,
+		SessionId:       item.SessionID,
+		RequestId:       item.RequestID,
+		Policy:          item.Policy,
+		ChunkId:         item.ChunkID,
+		Source:          item.Source,
+		PageRefs:        append([]string(nil), item.PageRefs...),
+		ContentHash:     item.ContentHash,
+		SummaryText:     item.SummaryText,
+		FragmentTypes:   append([]string(nil), item.FragmentTypes...),
+		Provider:        item.Provider,
+		ProviderVersion: item.ProviderVersion,
+		SchemaVersion:   item.SchemaVersion,
+	}
+	if !item.CreatedAt.IsZero() {
+		out.CreatedAt = timestamppb.New(item.CreatedAt)
+	}
+	if !item.ExpiresAt.IsZero() {
+		out.ExpiresAt = timestamppb.New(item.ExpiresAt)
+	}
+	return out
 }
 
 func mapDomainAudits(items []core.StepAudit) []dto.StepAudit {

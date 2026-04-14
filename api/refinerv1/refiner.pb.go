@@ -9,6 +9,7 @@ package refinerv1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -892,19 +893,184 @@ func (x *PageInRequest) GetPageKeys() []string {
 	return nil
 }
 
+type SummaryArtifact struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ArtifactId      string                 `protobuf:"bytes,1,opt,name=artifact_id,json=artifactId,proto3" json:"artifact_id,omitempty"`
+	JobId           string                 `protobuf:"bytes,2,opt,name=job_id,json=jobId,proto3" json:"job_id,omitempty"`
+	SessionId       string                 `protobuf:"bytes,3,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	RequestId       string                 `protobuf:"bytes,4,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Policy          string                 `protobuf:"bytes,5,opt,name=policy,proto3" json:"policy,omitempty"`
+	ChunkId         string                 `protobuf:"bytes,6,opt,name=chunk_id,json=chunkId,proto3" json:"chunk_id,omitempty"`
+	Source          string                 `protobuf:"bytes,7,opt,name=source,proto3" json:"source,omitempty"`
+	PageRefs        []string               `protobuf:"bytes,8,rep,name=page_refs,json=pageRefs,proto3" json:"page_refs,omitempty"`
+	ContentHash     string                 `protobuf:"bytes,9,opt,name=content_hash,json=contentHash,proto3" json:"content_hash,omitempty"`
+	SummaryText     string                 `protobuf:"bytes,10,opt,name=summary_text,json=summaryText,proto3" json:"summary_text,omitempty"`
+	FragmentTypes   []string               `protobuf:"bytes,11,rep,name=fragment_types,json=fragmentTypes,proto3" json:"fragment_types,omitempty"`
+	Provider        string                 `protobuf:"bytes,12,opt,name=provider,proto3" json:"provider,omitempty"`
+	ProviderVersion string                 `protobuf:"bytes,13,opt,name=provider_version,json=providerVersion,proto3" json:"provider_version,omitempty"`
+	SchemaVersion   string                 `protobuf:"bytes,14,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	CreatedAt       *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	ExpiresAt       *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *SummaryArtifact) Reset() {
+	*x = SummaryArtifact{}
+	mi := &file_api_refiner_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SummaryArtifact) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SummaryArtifact) ProtoMessage() {}
+
+func (x *SummaryArtifact) ProtoReflect() protoreflect.Message {
+	mi := &file_api_refiner_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SummaryArtifact.ProtoReflect.Descriptor instead.
+func (*SummaryArtifact) Descriptor() ([]byte, []int) {
+	return file_api_refiner_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SummaryArtifact) GetArtifactId() string {
+	if x != nil {
+		return x.ArtifactId
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetJobId() string {
+	if x != nil {
+		return x.JobId
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetPolicy() string {
+	if x != nil {
+		return x.Policy
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetChunkId() string {
+	if x != nil {
+		return x.ChunkId
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetPageRefs() []string {
+	if x != nil {
+		return x.PageRefs
+	}
+	return nil
+}
+
+func (x *SummaryArtifact) GetContentHash() string {
+	if x != nil {
+		return x.ContentHash
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetSummaryText() string {
+	if x != nil {
+		return x.SummaryText
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetFragmentTypes() []string {
+	if x != nil {
+		return x.FragmentTypes
+	}
+	return nil
+}
+
+func (x *SummaryArtifact) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetProviderVersion() string {
+	if x != nil {
+		return x.ProviderVersion
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetSchemaVersion() string {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return ""
+}
+
+func (x *SummaryArtifact) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *SummaryArtifact) GetExpiresAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return nil
+}
+
 type StoredPage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Key           string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
-	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
-	IsSummary     bool                   `protobuf:"varint,3,opt,name=is_summary,json=isSummary,proto3" json:"is_summary,omitempty"`
-	SummaryJobId  string                 `protobuf:"bytes,4,opt,name=summary_job_id,json=summaryJobId,proto3" json:"summary_job_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Key             string                 `protobuf:"bytes,1,opt,name=key,proto3" json:"key,omitempty"`
+	Content         string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	IsSummary       bool                   `protobuf:"varint,3,opt,name=is_summary,json=isSummary,proto3" json:"is_summary,omitempty"`
+	SummaryJobId    string                 `protobuf:"bytes,4,opt,name=summary_job_id,json=summaryJobId,proto3" json:"summary_job_id,omitempty"`
+	SummaryArtifact *SummaryArtifact       `protobuf:"bytes,5,opt,name=summary_artifact,json=summaryArtifact,proto3" json:"summary_artifact,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *StoredPage) Reset() {
 	*x = StoredPage{}
-	mi := &file_api_refiner_proto_msgTypes[11]
+	mi := &file_api_refiner_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -916,7 +1082,7 @@ func (x *StoredPage) String() string {
 func (*StoredPage) ProtoMessage() {}
 
 func (x *StoredPage) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[11]
+	mi := &file_api_refiner_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -929,7 +1095,7 @@ func (x *StoredPage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StoredPage.ProtoReflect.Descriptor instead.
 func (*StoredPage) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{11}
+	return file_api_refiner_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *StoredPage) GetKey() string {
@@ -960,6 +1126,13 @@ func (x *StoredPage) GetSummaryJobId() string {
 	return ""
 }
 
+func (x *StoredPage) GetSummaryArtifact() *SummaryArtifact {
+	if x != nil {
+		return x.SummaryArtifact
+	}
+	return nil
+}
+
 type PageInResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Pages         []*StoredPage          `protobuf:"bytes,1,rep,name=pages,proto3" json:"pages,omitempty"`
@@ -969,7 +1142,7 @@ type PageInResponse struct {
 
 func (x *PageInResponse) Reset() {
 	*x = PageInResponse{}
-	mi := &file_api_refiner_proto_msgTypes[12]
+	mi := &file_api_refiner_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -981,7 +1154,7 @@ func (x *PageInResponse) String() string {
 func (*PageInResponse) ProtoMessage() {}
 
 func (x *PageInResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[12]
+	mi := &file_api_refiner_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -994,7 +1167,7 @@ func (x *PageInResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageInResponse.ProtoReflect.Descriptor instead.
 func (*PageInResponse) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{12}
+	return file_api_refiner_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *PageInResponse) GetPages() []*StoredPage {
@@ -1009,7 +1182,7 @@ var File_api_refiner_proto protoreflect.FileDescriptor
 const file_api_refiner_proto_rawDesc = "" +
 	"\n" +
 	"\x11api/refiner.proto\x12\n" +
-	"refiner.v1\"7\n" +
+	"refiner.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"7\n" +
 	"\aMessage\x12\x12\n" +
 	"\x04role\x18\x01 \x01(\tR\x04role\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\tR\acontent\"q\n" +
@@ -1087,14 +1260,38 @@ const file_api_refiner_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\",\n" +
 	"\rPageInRequest\x12\x1b\n" +
-	"\tpage_keys\x18\x01 \x03(\tR\bpageKeys\"}\n" +
+	"\tpage_keys\x18\x01 \x03(\tR\bpageKeys\"\xc0\x04\n" +
+	"\x0fSummaryArtifact\x12\x1f\n" +
+	"\vartifact_id\x18\x01 \x01(\tR\n" +
+	"artifactId\x12\x15\n" +
+	"\x06job_id\x18\x02 \x01(\tR\x05jobId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x03 \x01(\tR\tsessionId\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x04 \x01(\tR\trequestId\x12\x16\n" +
+	"\x06policy\x18\x05 \x01(\tR\x06policy\x12\x19\n" +
+	"\bchunk_id\x18\x06 \x01(\tR\achunkId\x12\x16\n" +
+	"\x06source\x18\a \x01(\tR\x06source\x12\x1b\n" +
+	"\tpage_refs\x18\b \x03(\tR\bpageRefs\x12!\n" +
+	"\fcontent_hash\x18\t \x01(\tR\vcontentHash\x12!\n" +
+	"\fsummary_text\x18\n" +
+	" \x01(\tR\vsummaryText\x12%\n" +
+	"\x0efragment_types\x18\v \x03(\tR\rfragmentTypes\x12\x1a\n" +
+	"\bprovider\x18\f \x01(\tR\bprovider\x12)\n" +
+	"\x10provider_version\x18\r \x01(\tR\x0fproviderVersion\x12%\n" +
+	"\x0eschema_version\x18\x0e \x01(\tR\rschemaVersion\x129\n" +
+	"\n" +
+	"created_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"expires_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\xc5\x01\n" +
 	"\n" +
 	"StoredPage\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\tR\acontent\x12\x1d\n" +
 	"\n" +
 	"is_summary\x18\x03 \x01(\bR\tisSummary\x12$\n" +
-	"\x0esummary_job_id\x18\x04 \x01(\tR\fsummaryJobId\">\n" +
+	"\x0esummary_job_id\x18\x04 \x01(\tR\fsummaryJobId\x12F\n" +
+	"\x10summary_artifact\x18\x05 \x01(\v2\x1b.refiner.v1.SummaryArtifactR\x0fsummaryArtifact\">\n" +
 	"\x0ePageInResponse\x12,\n" +
 	"\x05pages\x18\x01 \x03(\v2\x16.refiner.v1.StoredPageR\x05pages*\xfc\x01\n" +
 	"\fFragmentType\x12\x1d\n" +
@@ -1124,7 +1321,7 @@ func file_api_refiner_proto_rawDescGZIP() []byte {
 }
 
 var file_api_refiner_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_refiner_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
+var file_api_refiner_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_api_refiner_proto_goTypes = []any{
 	(FragmentType)(0),             // 0: refiner.v1.FragmentType
 	(*Message)(nil),               // 1: refiner.v1.Message
@@ -1138,10 +1335,12 @@ var file_api_refiner_proto_goTypes = []any{
 	(*StepAudit)(nil),             // 9: refiner.v1.StepAudit
 	(*RefineResponse)(nil),        // 10: refiner.v1.RefineResponse
 	(*PageInRequest)(nil),         // 11: refiner.v1.PageInRequest
-	(*StoredPage)(nil),            // 12: refiner.v1.StoredPage
-	(*PageInResponse)(nil),        // 13: refiner.v1.PageInResponse
-	nil,                           // 14: refiner.v1.StepAudit.DetailsEntry
-	nil,                           // 15: refiner.v1.RefineResponse.MetadataEntry
+	(*SummaryArtifact)(nil),       // 12: refiner.v1.SummaryArtifact
+	(*StoredPage)(nil),            // 13: refiner.v1.StoredPage
+	(*PageInResponse)(nil),        // 14: refiner.v1.PageInResponse
+	nil,                           // 15: refiner.v1.StepAudit.DetailsEntry
+	nil,                           // 16: refiner.v1.RefineResponse.MetadataEntry
+	(*timestamppb.Timestamp)(nil), // 17: google.protobuf.Timestamp
 }
 var file_api_refiner_proto_depIdxs = []int32{
 	0,  // 0: refiner.v1.RagFragment.type:type_name -> refiner.v1.FragmentType
@@ -1149,22 +1348,25 @@ var file_api_refiner_proto_depIdxs = []int32{
 	1,  // 2: refiner.v1.RefineRequest.messages:type_name -> refiner.v1.Message
 	3,  // 3: refiner.v1.RefineRequest.rag_chunks:type_name -> refiner.v1.RagChunk
 	5,  // 4: refiner.v1.RefineRequest.model:type_name -> refiner.v1.ModelConfig
-	14, // 5: refiner.v1.StepAudit.details:type_name -> refiner.v1.StepAudit.DetailsEntry
+	15, // 5: refiner.v1.StepAudit.details:type_name -> refiner.v1.StepAudit.DetailsEntry
 	7,  // 6: refiner.v1.StepAudit.capabilities:type_name -> refiner.v1.ProcessorCapabilities
 	8,  // 7: refiner.v1.StepAudit.semantic:type_name -> refiner.v1.StepSemanticAudit
 	9,  // 8: refiner.v1.RefineResponse.audits:type_name -> refiner.v1.StepAudit
 	4,  // 9: refiner.v1.RefineResponse.paged_chunks:type_name -> refiner.v1.PagedChunk
-	15, // 10: refiner.v1.RefineResponse.metadata:type_name -> refiner.v1.RefineResponse.MetadataEntry
-	12, // 11: refiner.v1.PageInResponse.pages:type_name -> refiner.v1.StoredPage
-	6,  // 12: refiner.v1.RefinerService.Refine:input_type -> refiner.v1.RefineRequest
-	11, // 13: refiner.v1.RefinerService.PageIn:input_type -> refiner.v1.PageInRequest
-	10, // 14: refiner.v1.RefinerService.Refine:output_type -> refiner.v1.RefineResponse
-	13, // 15: refiner.v1.RefinerService.PageIn:output_type -> refiner.v1.PageInResponse
-	14, // [14:16] is the sub-list for method output_type
-	12, // [12:14] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	16, // 10: refiner.v1.RefineResponse.metadata:type_name -> refiner.v1.RefineResponse.MetadataEntry
+	17, // 11: refiner.v1.SummaryArtifact.created_at:type_name -> google.protobuf.Timestamp
+	17, // 12: refiner.v1.SummaryArtifact.expires_at:type_name -> google.protobuf.Timestamp
+	12, // 13: refiner.v1.StoredPage.summary_artifact:type_name -> refiner.v1.SummaryArtifact
+	13, // 14: refiner.v1.PageInResponse.pages:type_name -> refiner.v1.StoredPage
+	6,  // 15: refiner.v1.RefinerService.Refine:input_type -> refiner.v1.RefineRequest
+	11, // 16: refiner.v1.RefinerService.PageIn:input_type -> refiner.v1.PageInRequest
+	10, // 17: refiner.v1.RefinerService.Refine:output_type -> refiner.v1.RefineResponse
+	14, // 18: refiner.v1.RefinerService.PageIn:output_type -> refiner.v1.PageInResponse
+	17, // [17:19] is the sub-list for method output_type
+	15, // [15:17] is the sub-list for method input_type
+	15, // [15:15] is the sub-list for extension type_name
+	15, // [15:15] is the sub-list for extension extendee
+	0,  // [0:15] is the sub-list for field type_name
 }
 
 func init() { file_api_refiner_proto_init() }
@@ -1178,7 +1380,7 @@ func file_api_refiner_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_refiner_proto_rawDesc), len(file_api_refiner_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   15,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

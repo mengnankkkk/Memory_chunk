@@ -51,6 +51,7 @@
 看：
 
 - [docs/principles-and-internals.md](/E:/github/Memory_chunk/docs/principles-and-internals.md)
+- [docs/kv-cache-design.md](/E:/github/Memory_chunk/docs/kv-cache-design.md)
 
 ### 2.6 先想知道现在做到哪了、接下来做什么
 
@@ -92,6 +93,9 @@
 
 - [docs/principles-and-internals.md](/E:/github/Memory_chunk/docs/principles-and-internals.md)
   为什么这样设计、核心原理、取舍和边界。
+
+- [docs/kv-cache-design.md](/E:/github/Memory_chunk/docs/kv-cache-design.md)
+  应用层 KV cache 的边界、prefix identity、admission、TTL、miss 诊断与实现细节。
 
 ### 3.5 Learning
 
@@ -137,7 +141,8 @@
 
 1. [docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
 2. [docs/principles-and-internals.md](/E:/github/Memory_chunk/docs/principles-and-internals.md)
-3. [docs/implementation-plan.md](/E:/github/Memory_chunk/docs/implementation-plan.md)
+3. [docs/kv-cache-design.md](/E:/github/Memory_chunk/docs/kv-cache-design.md)
+4. [docs/implementation-plan.md](/E:/github/Memory_chunk/docs/implementation-plan.md)
 
 ## 5. 维护规则
 

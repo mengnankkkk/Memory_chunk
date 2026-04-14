@@ -168,10 +168,11 @@ func (s *RefinerApplicationService) PageInDTO(ctx context.Context, req *dto.Page
 			pageHits++
 		}
 		out.Pages = append(out.Pages, dto.StoredPage{
-			Key:          key,
-			Content:      page.Content,
-			IsSummary:    page.IsSummary,
-			SummaryJobID: page.SummaryJobID,
+			Key:             key,
+			Content:         page.Content,
+			IsSummary:       page.IsSummary,
+			SummaryJobID:    page.SummaryJobID,
+			SummaryArtifact: mapSummaryArtifactToDTO(page.SummaryArtifact),
 		})
 	}
 	s.metrics.ObservePageIn("ok", len(req.PageKeys), summaryHits, pageHits, time.Since(start))
@@ -210,4 +211,28 @@ func metadataString(items map[string]string, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(items[key])
+}
+
+func mapSummaryArtifactToDTO(artifact *repository.SummaryArtifact) *dto.SummaryArtifact {
+	if artifact == nil {
+		return nil
+	}
+	return &dto.SummaryArtifact{
+		ArtifactID:      artifact.ArtifactID,
+		JobID:           artifact.JobID,
+		SessionID:       artifact.SessionID,
+		RequestID:       artifact.RequestID,
+		Policy:          artifact.Policy,
+		ChunkID:         artifact.ChunkID,
+		Source:          artifact.Source,
+		PageRefs:        append([]string(nil), artifact.PageRefs...),
+		ContentHash:     artifact.ContentHash,
+		SummaryText:     artifact.SummaryText,
+		FragmentTypes:   append([]string(nil), artifact.FragmentTypes...),
+		Provider:        artifact.Provider,
+		ProviderVersion: artifact.ProviderVersion,
+		SchemaVersion:   artifact.SchemaVersion,
+		CreatedAt:       artifact.CreatedAt,
+		ExpiresAt:       artifact.ExpiresAt,
+	}
 }

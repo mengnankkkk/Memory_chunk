@@ -22,6 +22,7 @@
 - 代码结构与核心模块：[docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
 - AI / Agent 协作入口：[Agent.md](/E:/github/Memory_chunk/Agent.md)
 - 原理、取舍与边界：[docs/principles-and-internals.md](/E:/github/Memory_chunk/docs/principles-and-internals.md)
+- 应用层 KV cache 设计：[docs/kv-cache-design.md](/E:/github/Memory_chunk/docs/kv-cache-design.md)
 - 当前进度：[docs/todolist.md](/E:/github/Memory_chunk/docs/todolist.md)
 - 后续路线：[docs/implementation-plan.md](/E:/github/Memory_chunk/docs/implementation-plan.md)
 - 测试补齐计划：[docs/test-plan.md](/E:/github/Memory_chunk/docs/test-plan.md)

@@ -209,6 +209,7 @@ func StartSummaryWorker(ctx context.Context, runtime *AppRuntime) {
 	worker := summary.NewWorker(
 		runtime.RedisRepository,
 		runtime.PageRepository,
+		summary.NewHeuristicProvider(),
 		runtime.MetricsRecorder,
 		runtime.Cfg.SummaryWorker.ConsumerGroup,
 		runtime.Cfg.SummaryWorker.ConsumerName,

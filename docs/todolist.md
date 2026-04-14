@@ -45,7 +45,8 @@
 - 当前目录结构与旧层级残留已完成收敛：
   说明：已落地 `controller / service / mapper / dto / domain / adapter / observability / bootstrap / tests`，`dto` 已接入 service 内部调用链，空壳旧目录与主要错层文档引用也已清理
 - 当前 summary worker 仍为启发式摘要
-- 当前摘要回填仍偏 page 级
+- 当前摘要回填仍偏 page 级：
+  说明：已升级为结构化 `SummaryArtifact`，但当前仍按 page key 挂载与读取，尚未做独立 chunk 级摘要索引
 - 当前虽然已把应用层“可命中性预测”落到 `response metadata`，但还没有接入 `explain / dry_run / metrics / dashboard`
 - 当前还没有 `dry_run / explain / cache debug`
 - 当前虽然已有基础 overview dashboard，但还没有离线 replay / prefix churn / top miss dashboard / alerting
@@ -85,10 +86,13 @@
 
 ### 2.2 P1 摘要链路升级
 
-- [ ] 抽象 `SummaryProvider`
+- [x] 抽象 `SummaryProvider`
+  说明：`summary worker` 已切到 `Provider -> SummaryArtifact -> Redis store` 链路，当前默认实现仍为启发式 provider
 - [ ] 接真实外部摘要模型
-- [ ] 设计结构化 `SummaryArtifact`
-- [ ] 增加 summary 失效与重试策略
+- [x] 设计结构化 `SummaryArtifact`
+  说明：已落地 `artifact_id / content_hash / fragment_types / provider / provider_version / schema_version / created_at / expires_at`，并在 worker、Redis 存储和 `PageIn` protobuf 返回链路中生效
+- [-] 增加 summary 失效与重试策略
+  说明：`content_hash / schema_version / provider_version / expires_at` 失效已完成，读取失效 artifact 时会删除并回退原 page；worker retry 仍待补
 - [ ] 支持 chunk 级 summary artifact
 
 ### 2.3 应用层 KV 下一阶段
