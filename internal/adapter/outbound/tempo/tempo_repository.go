@@ -30,7 +30,7 @@ type Repository struct {
 func NewRepository(cfg Config) (*Repository, error) {
 	baseURL := strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/")
 	if baseURL == "" {
-		baseURL = "http://localhost:3200"
+		baseURL = "http://localhost:13200"
 	}
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 8 * time.Second

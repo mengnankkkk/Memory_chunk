@@ -4,7 +4,7 @@
 
 现在可以直接在仓库根目录使用 `docker compose` 一键部署完整的 Context Refiner 应用栈，包括：
 
-- **context-refiner-app**：核心服务（gRPC + REST API + Dashboard）
+- **refiner**：核心服务（gRPC + REST API + Dashboard）
 - **redis**：数据存储
 - **prometheus**：指标收集
 - **tempo**：链路追踪
@@ -117,6 +117,21 @@ curl -X POST http://localhost:18080/api/refine \
 - 为 `redis` 增加健康检查
 - 让 Prometheus 改为抓取容器内的 `refiner:19091`
 
+## 实际启动流程
+
+根目录 `docker compose up -d --build` 按当前代码与编排会经历下面这条链路：
+
+1. 先读取根目录 `docker-compose.yml`
+2. 使用根目录 `Dockerfile` 构建 `refiner` 镜像
+3. `Dockerfile` 在构建阶段执行 `go mod download` 与 `go build ./cmd/refiner`
+4. 运行阶段镜像把 `config/` 复制进容器，并默认设置 `CONFIG_FILE=/app/config/service.docker.yaml`
+5. Compose 先启动 `tempo`、`otel-collector`、`prometheus`、`grafana`、`redis`
+6. `redis` 通过 `redis-cli ping` 健康检查后，`refiner` 才会启动
+7. `refiner` 进程启动后读取 `config/service.docker.yaml`
+8. 应用监听 `0.0.0.0:15051`、`0.0.0.0:18080`、`0.0.0.0:19091`
+9. 镜像内健康检查通过 `http://127.0.0.1:18080/api/snapshot` 判断应用是否就绪
+10. Prometheus 通过 `refiner:19091/metrics` 抓取指标，Grafana 通过容器网络访问 Prometheus 和 Tempo
+
 ## 数据持久化
 
 以下数据会持久化到 Docker volumes：
@@ -160,6 +175,15 @@ GOPROXY=https://goproxy.cn,direct docker compose build --no-cache refiner
 docker network inspect context-refiner_refiner-net
 ```
 
+如果你之前已经在 `deploy/observability` 目录下启动过旧栈，同一组端口可能会被旧容器占用。可先执行：
+
+```bash
+cd deploy/observability
+docker compose down
+cd ../..
+docker compose up -d --build
+```
+
 ### 4. 重新构建镜像
 
 ```bash
@@ -170,7 +194,7 @@ docker compose up -d
 ### 5. 查看 refiner 启动日志
 
 ```bash
-docker compose logs refiner | head -20
+docker compose logs --tail=20 refiner
 ```
 
 应该看到：

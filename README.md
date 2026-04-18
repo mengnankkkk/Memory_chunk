@@ -19,6 +19,7 @@
 
 - 项目定位与整体设计：[docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
 - 本地启动与最小调用：[docs/quickstart.md](/E:/github/Memory_chunk/docs/quickstart.md)
+- Docker Compose 一键部署：[docs/docker-deployment.md](/E:/github/Memory_chunk/docs/docker-deployment.md)
 - 代码结构与核心模块：[docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
 - AI / Agent 协作入口：[Agent.md](/E:/github/Memory_chunk/Agent.md)
 - 原理、取舍与边界：[docs/principles-and-internals.md](/E:/github/Memory_chunk/docs/principles-and-internals.md)
@@ -62,8 +63,9 @@
 1. [docs/README.md](/E:/github/Memory_chunk/docs/README.md)
 2. [docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
 3. [docs/quickstart.md](/E:/github/Memory_chunk/docs/quickstart.md)
-4. [docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
-5. [Agent.md](/E:/github/Memory_chunk/Agent.md)
+4. [docs/docker-deployment.md](/E:/github/Memory_chunk/docs/docker-deployment.md)
+5. [docs/code-design.md](/E:/github/Memory_chunk/docs/code-design.md)
+6. [Agent.md](/E:/github/Memory_chunk/Agent.md)
 
 如果你是准备补测试或继续工程化，建议按这个顺序：
 

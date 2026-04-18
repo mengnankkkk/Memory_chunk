@@ -103,7 +103,7 @@ func LoadAppConfig(path string) (*AppConfig, error) {
 		cfg.Pipeline.PagingTokenThreshold = 320
 	}
 	if strings.TrimSpace(cfg.Web.ListenAddr) == "" {
-		cfg.Web.ListenAddr = "127.0.0.1:8080"
+		cfg.Web.ListenAddr = "127.0.0.1:18080"
 	}
 	if cfg.Web.PageSize <= 0 {
 		cfg.Web.PageSize = 8
@@ -135,10 +135,10 @@ func LoadAppConfig(path string) (*AppConfig, error) {
 		cfg.Observability.ServiceName = "context-refiner"
 	}
 	if strings.TrimSpace(cfg.Observability.TempoQueryURL) == "" {
-		cfg.Observability.TempoQueryURL = "http://localhost:3200"
+		cfg.Observability.TempoQueryURL = "http://localhost:13200"
 	}
 	if cfg.Observability.MetricsEnabled && strings.TrimSpace(cfg.Observability.MetricsListenAddr) == "" {
-		cfg.Observability.MetricsListenAddr = ":9091"
+		cfg.Observability.MetricsListenAddr = ":19091"
 	}
 	if cfg.Observability.TracingSampleRate <= 0 || cfg.Observability.TracingSampleRate > 1 {
 		cfg.Observability.TracingSampleRate = 1

@@ -4,7 +4,7 @@
 
 `POST /api/refine` 是一个简化的 REST 端点，让外部应用无需 gRPC 即可接入上下文清洗服务。
 
-- **地址**：`http://127.0.0.1:8080/api/refine`（与 dashboard 同端口）
+- **地址**：`http://127.0.0.1:18080/api/refine`（与 dashboard 同端口）
 - **方法**：`POST`
 - **Content-Type**：`application/json; charset=utf-8`
 
@@ -78,7 +78,7 @@
 ### curl
 
 ```bash
-curl -X POST http://127.0.0.1:8080/api/refine \
+curl -X POST http://127.0.0.1:18080/api/refine \
   -H "Content-Type: application/json; charset=utf-8" \
   -d '{
     "system": "你是代码助手",
@@ -94,7 +94,7 @@ curl -X POST http://127.0.0.1:8080/api/refine \
 import requests
 
 resp = requests.post(
-    "http://127.0.0.1:8080/api/refine",
+    "http://127.0.0.1:18080/api/refine",
     json={
         "system": "你是代码助手",
         "messages": [{"role": "user", "content": "帮我排查"}],
@@ -111,7 +111,7 @@ print(f"节省 tokens: {data['saved_tokens']}")
 ### JavaScript / Node.js
 
 ```javascript
-const response = await fetch("http://127.0.0.1:8080/api/refine", {
+const response = await fetch("http://127.0.0.1:18080/api/refine", {
   method: "POST",
   headers: { "Content-Type": "application/json; charset=utf-8" },
   body: JSON.stringify({
@@ -144,7 +144,7 @@ console.log(`cache hit: ${data.cache_hit}`);
 | 维度 | gRPC (`RefinerService.Refine`) | HTTP REST (`POST /api/refine`) |
 |------|-------------------------------|-------------------------------|
 | 协议 | gRPC + protobuf | HTTP + JSON |
-| 端口 | `:50051` | `:8080`（与 dashboard 共用） |
+| 端口 | `:15051` | `:18080`（与 dashboard 共用） |
 | 客户端 | 需编译 proto、装 gRPC SDK | 任何 HTTP 客户端即可 |
 | 入参 | 嵌套结构（`RagFragment`, `FragmentType`, `ModelConfig`） | 扁平 JSON，支持字符串数组简写 |
 | 出参 | 完整 `RefineResponse`（含 `audits`, `paged_chunks` 等） | 精简字段，只暴露集成方关心的 |
@@ -153,7 +153,7 @@ console.log(`cache hit: ${data.cache_hit}`);
 ## 注意事项
 
 1. **编码**：请求和响应均为 UTF-8，建议显式指定 `Content-Type: application/json; charset=utf-8`。
-2. **trace_id**：返回的 `trace_id` 可以在 dashboard (`http://127.0.0.1:8080`) 的「按 Trace ID 打开评估」中粘贴查看详细清洗步骤。
+2. **trace_id**：返回的 `trace_id` 可以在 dashboard (`http://127.0.0.1:18080`) 的「按 Trace ID 打开评估」中粘贴查看详细清洗步骤。
 3. **session_id**：同一 session 内的多次请求会共享前缀缓存，建议外部应用维护稳定的 session_id。
 4. **budget**：如果不传 `budget`，服务端会从 `policy` 或 `model.max_context_tokens` 推导，但建议显式指定以避免歧义。
 5. **rag 格式**：字符串数组会自动包装成 `FRAGMENT_TYPE_BODY`；如需指定 `FRAGMENT_TYPE_CODE` / `FRAGMENT_TYPE_LOG` 等，请用对象数组格式。
@@ -162,7 +162,7 @@ console.log(`cache hit: ${data.cache_hit}`);
 
 ```bash
 # 1. 发起清洗请求
-RESPONSE=$(curl -s -X POST http://127.0.0.1:8080/api/refine \
+RESPONSE=$(curl -s -X POST http://127.0.0.1:18080/api/refine \
   -H "Content-Type: application/json" \
   -d '{
     "system": "你是代码助手",
@@ -185,7 +185,7 @@ curl https://api.openai.com/v1/chat/completions \
 
 # 4. 如需查看清洗详情，复制 trace_id 到 dashboard
 TRACE_ID=$(echo "$RESPONSE" | jq -r '.trace_id')
-echo "查看详情: http://127.0.0.1:8080/?trace=$TRACE_ID"
+echo "查看详情: http://127.0.0.1:18080/?trace=$TRACE_ID"
 ```
 
 ## 更新日志

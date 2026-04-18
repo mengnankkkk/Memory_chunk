@@ -1,7 +1,7 @@
 # Context Refiner 文档索引
 
-- 文档版本：`v2026.04.07`
-- 更新日期：`2026-04-07`
+- 文档版本：`v2026.04.18`
+- 更新日期：`2026-04-18`
 - 文档类型：`Documentation Index`
 
 > 2026-04-11 起，代码结构请优先以 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md) 为准。
@@ -32,6 +32,7 @@
 看：
 
 - [docs/quickstart.md](/E:/github/Memory_chunk/docs/quickstart.md)
+- [docs/docker-deployment.md](/E:/github/Memory_chunk/docs/docker-deployment.md)
 
 ### 2.3 先想理解代码结构 / 分层
 
@@ -89,6 +90,9 @@
 - [docs/quickstart.md](/E:/github/Memory_chunk/docs/quickstart.md)
   本地配置、启动、调用、排障。
 
+- [docs/docker-deployment.md](/E:/github/Memory_chunk/docs/docker-deployment.md)
+  根目录 `docker compose` 一键部署、端口映射、健康检查、排障。
+
 ### 3.4 Explanation
 
 - [docs/principles-and-internals.md](/E:/github/Memory_chunk/docs/principles-and-internals.md)
@@ -126,7 +130,8 @@
 
 1. [docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
 2. [docs/quickstart.md](/E:/github/Memory_chunk/docs/quickstart.md)
-3. [docs/learning-guide.md](/E:/github/Memory_chunk/docs/learning-guide.md)
+3. [docs/docker-deployment.md](/E:/github/Memory_chunk/docs/docker-deployment.md)
+4. [docs/learning-guide.md](/E:/github/Memory_chunk/docs/learning-guide.md)
 
 ### 路径 B：准备改代码
 
@@ -151,6 +156,7 @@
 - 改架构边界时，先改 `context-refiner-design.md`
 - 改具体代码结构时，先改 `code-design.md`
 - 改启动方式或调用方式时，先改 `quickstart.md`
+- 改根目录 `docker compose` 部署流程时，先改 `docker-deployment.md`
 - 改当前状态与优先级时，先改 `todolist.md`
 - 改阶段计划时，先改 `implementation-plan.md`
 - 改测试策略、覆盖范围和阶段验收时，先改 `test-plan.md`
