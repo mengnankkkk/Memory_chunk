@@ -79,11 +79,8 @@ func buildDockerIncidentScenario() scenario {
 				Model:            "gpt-4o-mini",
 				MaxContextTokens: 8192,
 			},
+			System: "你是一个偏运维和后端排障的代码助手。请在压缩上下文时保留：失败服务名、端口、容器名、调用路径、错误码、根因猜测、最后一次成功配置，以及用户明确指出不能丢的上下文。",
 			Messages: []*refinerv1.Message{
-				{
-					Role:    "system",
-					Content: "你是一个偏运维和后端排障的代码助手。请在压缩上下文时保留：失败服务名、端口、容器名、调用路径、错误码、根因猜测、最后一次成功配置，以及用户明确指出不能丢的上下文。",
-				},
 				{
 					Role:    "user",
 					Content: "我在本机 Windows 上调试 Docker Compose 部署，context-refiner、otel-collector、tempo、redis 都在混跑。现在我需要一份可交给同事的精简上下文，但不能丢失 collector EOF、端口映射、compose 版本差异、以及最近一次 fallback summary 的线索。",
@@ -97,8 +94,9 @@ func buildDockerIncidentScenario() scenario {
 					Content: "下面是新补充的运行上下文。我要你压缩，但要保留从 collector 到 tempo 的链路问题、Redis 积压、以及用户偏好中文输出这几个重点。",
 				},
 			},
-			RagChunks: []*refinerv1.RagChunk{
-				{
+			Memory: &refinerv1.Memory{
+				RagChunks: []*refinerv1.RagChunk{
+					{
 					Id:      "docker-log-otel",
 					Source:  "runtime/docker-log",
 					Sources: []string{"runtime/docker-log", "runtime/compose"},
@@ -167,6 +165,7 @@ func buildDockerIncidentScenario() scenario {
 					},
 				},
 			},
+			},
 		},
 	}
 }
@@ -182,11 +181,8 @@ func buildFrontendRegressionScenario() scenario {
 				Model:            "gpt-4o-mini",
 				MaxContextTokens: 8192,
 			},
+			System: "你是一个前端审查助手。请在压缩时保留：用户路径、复现步骤、关键 DOM 结构、报错栈、视觉回归说明、以及与字体/响应式相关的诉求。",
 			Messages: []*refinerv1.Message{
-				{
-					Role:    "system",
-					Content: "你是一个前端审查助手。请在压缩时保留：用户路径、复现步骤、关键 DOM 结构、报错栈、视觉回归说明、以及与字体/响应式相关的诉求。",
-				},
 				{
 					Role:    "user",
 					Content: "我们刚把 trace dashboard 改成中文评估面板，但用户说移动端字体过小、上下文对比区滚动不顺、步骤卡片太密。我要保留能支撑设计迭代的上下文，同时压缩成评估 prompt。",
@@ -200,8 +196,9 @@ func buildFrontendRegressionScenario() scenario {
 					Content: "下面有浏览器控制台、可访问性检查、DOM 结构和 CSS 片段。请保留最关键的前端证据链，不要把噪音信息全带上。",
 				},
 			},
-			RagChunks: []*refinerv1.RagChunk{
-				{
+			Memory: &refinerv1.Memory{
+				RagChunks: []*refinerv1.RagChunk{
+					{
 					Id:      "browser-console",
 					Source:  "playwright/console",
 					Sources: []string{"playwright/console", "playwright/a11y"},
@@ -280,6 +277,7 @@ func buildFrontendRegressionScenario() scenario {
 					},
 				},
 			},
+			},
 		},
 	}
 }
@@ -295,11 +293,8 @@ func buildSecurityAuditScenario() scenario {
 				Model:            "gpt-4o-mini",
 				MaxContextTokens: 8192,
 			},
+			System: "你是一个安全审计助手。请在压缩上下文时保留：泄露风险、证据位置、影响范围、是否已脱敏、修复建议、和必须回归验证的路径。",
 			Messages: []*refinerv1.Message{
-				{
-					Role:    "system",
-					Content: "你是一个安全审计助手。请在压缩上下文时保留：泄露风险、证据位置、影响范围、是否已脱敏、修复建议、和必须回归验证的路径。",
-				},
 				{
 					Role:    "user",
 					Content: "我在审计上下文清洗的副作用，担心日志、tool output、JSON 片段里把 token、cookie、内网地址、trace id 混进最终 prompt。请保留那些会影响安全结论的上下文。",
@@ -309,8 +304,9 @@ func buildSecurityAuditScenario() scenario {
 					Content: "重点保留：疑似 secret 的字段名、出现场景、是否已归一化或掩码、以及用户要求必须继续支持中文展示和本机调试。",
 				},
 			},
-			RagChunks: []*refinerv1.RagChunk{
-				{
+			Memory: &refinerv1.Memory{
+				RagChunks: []*refinerv1.RagChunk{
+					{
 					Id:      "security-json",
 					Source:  "audit/raw-json",
 					Sources: []string{"audit/raw-json"},
@@ -348,6 +344,7 @@ func buildSecurityAuditScenario() scenario {
 					},
 				},
 			},
+			},
 		},
 	}
 }
@@ -363,11 +360,8 @@ func buildDataPipelineScenario() scenario {
 				Model:            "gpt-4o-mini",
 				MaxContextTokens: 8192,
 			},
+			System: "你是一个数据平台排障助手。压缩时保留：数据源、行数、坏数据类型、字段漂移、SQL 片段、关键报错、修复策略、以及回归检查项。",
 			Messages: []*refinerv1.Message{
-				{
-					Role:    "system",
-					Content: "你是一个数据平台排障助手。压缩时保留：数据源、行数、坏数据类型、字段漂移、SQL 片段、关键报错、修复策略、以及回归检查项。",
-				},
 				{
 					Role:    "user",
 					Content: "昨晚 ETL 把订单上下文清洗错了，导致下游模型把字段 `price` 当成了字符串拼接。我要保留排障证据，但不能让上下文继续爆长。",
@@ -381,8 +375,9 @@ func buildDataPipelineScenario() scenario {
 					Content: "这里有 SQL、CSV 摘要、错误日志、和一段很长的数据字典。请尽可能压缩，但别丢订单金额类型漂移、退款行混入、地区字段映射错误这些问题。",
 				},
 			},
-			RagChunks: []*refinerv1.RagChunk{
-				{
+			Memory: &refinerv1.Memory{
+				RagChunks: []*refinerv1.RagChunk{
+					{
 					Id:      "etl-sql",
 					Source:  "warehouse/sql",
 					Sources: []string{"warehouse/sql"},
@@ -420,6 +415,7 @@ func buildDataPipelineScenario() scenario {
 						},
 					},
 				},
+			},
 			},
 		},
 	}

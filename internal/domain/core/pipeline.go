@@ -126,6 +126,8 @@ type RefineResponse struct {
 	BudgetMet            bool
 	Audits               []StepAudit
 	PagedChunks          []PagedChunk
+	Messages             []Message
+	RAGChunks            []RAGChunk
 	Metadata             map[string]string
 	PendingSummaryJobIDs []string
 }
@@ -255,6 +257,8 @@ func (p *Pipeline) Run(ctx context.Context, req *RefineRequest) (*RefineResponse
 		BudgetMet:            req.CurrentTokens <= req.Budget,
 		Audits:               append([]StepAudit(nil), req.Audits...),
 		PagedChunks:          extractPagedChunks(req),
+		Messages:             append([]Message(nil), req.Messages...),
+		RAGChunks:            append([]RAGChunk(nil), req.RAGChunks...),
 		Metadata:             cloneMap(req.Metadata),
 		PendingSummaryJobIDs: append([]string(nil), req.PendingSummaryJobIDs...),
 	}, nil

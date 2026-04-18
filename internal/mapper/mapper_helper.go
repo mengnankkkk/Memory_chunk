@@ -16,6 +16,14 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
+func normalizeMessageRole(value string) string {
+	role := strings.TrimSpace(strings.ToLower(value))
+	if role == "" {
+		return "user"
+	}
+	return role
+}
+
 func mapFragmentTypeFromProto(fragmentType refinerv1.FragmentType) string {
 	switch fragmentType {
 	case refinerv1.FragmentType_FRAGMENT_TYPE_TITLE:
@@ -55,5 +63,26 @@ func mapFragmentTypeToCore(fragmentType string) core.FragmentType {
 		return core.FragmentTypeErrorStack
 	default:
 		return core.FragmentTypeBody
+	}
+}
+
+func mapFragmentTypeToProto(fragmentType string) refinerv1.FragmentType {
+	switch mapFragmentTypeToCore(fragmentType) {
+	case core.FragmentTypeTitle:
+		return refinerv1.FragmentType_FRAGMENT_TYPE_TITLE
+	case core.FragmentTypeCode:
+		return refinerv1.FragmentType_FRAGMENT_TYPE_CODE
+	case core.FragmentTypeTable:
+		return refinerv1.FragmentType_FRAGMENT_TYPE_TABLE
+	case core.FragmentTypeJSON:
+		return refinerv1.FragmentType_FRAGMENT_TYPE_JSON
+	case core.FragmentTypeToolOutput:
+		return refinerv1.FragmentType_FRAGMENT_TYPE_TOOL_OUTPUT
+	case core.FragmentTypeLog:
+		return refinerv1.FragmentType_FRAGMENT_TYPE_LOG
+	case core.FragmentTypeErrorStack:
+		return refinerv1.FragmentType_FRAGMENT_TYPE_ERROR_STACK
+	default:
+		return refinerv1.FragmentType_FRAGMENT_TYPE_BODY
 	}
 }

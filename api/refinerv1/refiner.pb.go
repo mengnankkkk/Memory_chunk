@@ -397,22 +397,67 @@ func (x *ModelConfig) GetMaxContextTokens() int32 {
 	return 0
 }
 
+type Memory struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RagChunks     []*RagChunk            `protobuf:"bytes,1,rep,name=rag_chunks,json=ragChunks,proto3" json:"rag_chunks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Memory) Reset() {
+	*x = Memory{}
+	mi := &file_api_refiner_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Memory) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Memory) ProtoMessage() {}
+
+func (x *Memory) ProtoReflect() protoreflect.Message {
+	mi := &file_api_refiner_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Memory.ProtoReflect.Descriptor instead.
+func (*Memory) Descriptor() ([]byte, []int) {
+	return file_api_refiner_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *Memory) GetRagChunks() []*RagChunk {
+	if x != nil {
+		return x.RagChunks
+	}
+	return nil
+}
+
 type RefineRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Messages      []*Message             `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
-	RagChunks     []*RagChunk            `protobuf:"bytes,2,rep,name=rag_chunks,json=ragChunks,proto3" json:"rag_chunks,omitempty"`
 	Model         *ModelConfig           `protobuf:"bytes,3,opt,name=model,proto3" json:"model,omitempty"`
 	TokenBudget   int32                  `protobuf:"varint,4,opt,name=token_budget,json=tokenBudget,proto3" json:"token_budget,omitempty"`
 	Policy        string                 `protobuf:"bytes,5,opt,name=policy,proto3" json:"policy,omitempty"`
 	SessionId     string                 `protobuf:"bytes,6,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	RequestId     string                 `protobuf:"bytes,7,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	System        string                 `protobuf:"bytes,8,opt,name=system,proto3" json:"system,omitempty"`
+	Memory        *Memory                `protobuf:"bytes,9,opt,name=memory,proto3" json:"memory,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RefineRequest) Reset() {
 	*x = RefineRequest{}
-	mi := &file_api_refiner_proto_msgTypes[5]
+	mi := &file_api_refiner_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -424,7 +469,7 @@ func (x *RefineRequest) String() string {
 func (*RefineRequest) ProtoMessage() {}
 
 func (x *RefineRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[5]
+	mi := &file_api_refiner_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -437,19 +482,12 @@ func (x *RefineRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefineRequest.ProtoReflect.Descriptor instead.
 func (*RefineRequest) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{5}
+	return file_api_refiner_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *RefineRequest) GetMessages() []*Message {
 	if x != nil {
 		return x.Messages
-	}
-	return nil
-}
-
-func (x *RefineRequest) GetRagChunks() []*RagChunk {
-	if x != nil {
-		return x.RagChunks
 	}
 	return nil
 }
@@ -489,6 +527,20 @@ func (x *RefineRequest) GetRequestId() string {
 	return ""
 }
 
+func (x *RefineRequest) GetSystem() string {
+	if x != nil {
+		return x.System
+	}
+	return ""
+}
+
+func (x *RefineRequest) GetMemory() *Memory {
+	if x != nil {
+		return x.Memory
+	}
+	return nil
+}
+
 type ProcessorCapabilities struct {
 	state               protoimpl.MessageState `protogen:"open.v1"`
 	Aggressive          bool                   `protobuf:"varint,1,opt,name=aggressive,proto3" json:"aggressive,omitempty"`
@@ -502,7 +554,7 @@ type ProcessorCapabilities struct {
 
 func (x *ProcessorCapabilities) Reset() {
 	*x = ProcessorCapabilities{}
-	mi := &file_api_refiner_proto_msgTypes[6]
+	mi := &file_api_refiner_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -514,7 +566,7 @@ func (x *ProcessorCapabilities) String() string {
 func (*ProcessorCapabilities) ProtoMessage() {}
 
 func (x *ProcessorCapabilities) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[6]
+	mi := &file_api_refiner_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -527,7 +579,7 @@ func (x *ProcessorCapabilities) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProcessorCapabilities.ProtoReflect.Descriptor instead.
 func (*ProcessorCapabilities) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{6}
+	return file_api_refiner_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ProcessorCapabilities) GetAggressive() bool {
@@ -580,7 +632,7 @@ type StepSemanticAudit struct {
 
 func (x *StepSemanticAudit) Reset() {
 	*x = StepSemanticAudit{}
-	mi := &file_api_refiner_proto_msgTypes[7]
+	mi := &file_api_refiner_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -592,7 +644,7 @@ func (x *StepSemanticAudit) String() string {
 func (*StepSemanticAudit) ProtoMessage() {}
 
 func (x *StepSemanticAudit) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[7]
+	mi := &file_api_refiner_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -605,7 +657,7 @@ func (x *StepSemanticAudit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepSemanticAudit.ProtoReflect.Descriptor instead.
 func (*StepSemanticAudit) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{7}
+	return file_api_refiner_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *StepSemanticAudit) GetRemoved() []string {
@@ -672,7 +724,7 @@ type StepAudit struct {
 
 func (x *StepAudit) Reset() {
 	*x = StepAudit{}
-	mi := &file_api_refiner_proto_msgTypes[8]
+	mi := &file_api_refiner_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -684,7 +736,7 @@ func (x *StepAudit) String() string {
 func (*StepAudit) ProtoMessage() {}
 
 func (x *StepAudit) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[8]
+	mi := &file_api_refiner_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -697,7 +749,7 @@ func (x *StepAudit) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepAudit.ProtoReflect.Descriptor instead.
 func (*StepAudit) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{8}
+	return file_api_refiner_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *StepAudit) GetName() string {
@@ -751,7 +803,6 @@ func (x *StepAudit) GetSemantic() *StepSemanticAudit {
 
 type RefineResponse struct {
 	state                protoimpl.MessageState `protogen:"open.v1"`
-	OptimizedPrompt      string                 `protobuf:"bytes,1,opt,name=optimized_prompt,json=optimizedPrompt,proto3" json:"optimized_prompt,omitempty"`
 	InputTokens          int32                  `protobuf:"varint,2,opt,name=input_tokens,json=inputTokens,proto3" json:"input_tokens,omitempty"`
 	OutputTokens         int32                  `protobuf:"varint,3,opt,name=output_tokens,json=outputTokens,proto3" json:"output_tokens,omitempty"`
 	Audits               []*StepAudit           `protobuf:"bytes,4,rep,name=audits,proto3" json:"audits,omitempty"`
@@ -759,13 +810,16 @@ type RefineResponse struct {
 	Metadata             map[string]string      `protobuf:"bytes,6,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	BudgetMet            bool                   `protobuf:"varint,7,opt,name=budget_met,json=budgetMet,proto3" json:"budget_met,omitempty"`
 	PendingSummaryJobIds []string               `protobuf:"bytes,8,rep,name=pending_summary_job_ids,json=pendingSummaryJobIds,proto3" json:"pending_summary_job_ids,omitempty"`
+	System               string                 `protobuf:"bytes,9,opt,name=system,proto3" json:"system,omitempty"`
+	Messages             []*Message             `protobuf:"bytes,10,rep,name=messages,proto3" json:"messages,omitempty"`
+	Memory               *Memory                `protobuf:"bytes,11,opt,name=memory,proto3" json:"memory,omitempty"`
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
 
 func (x *RefineResponse) Reset() {
 	*x = RefineResponse{}
-	mi := &file_api_refiner_proto_msgTypes[9]
+	mi := &file_api_refiner_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -777,7 +831,7 @@ func (x *RefineResponse) String() string {
 func (*RefineResponse) ProtoMessage() {}
 
 func (x *RefineResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[9]
+	mi := &file_api_refiner_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -790,14 +844,7 @@ func (x *RefineResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefineResponse.ProtoReflect.Descriptor instead.
 func (*RefineResponse) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *RefineResponse) GetOptimizedPrompt() string {
-	if x != nil {
-		return x.OptimizedPrompt
-	}
-	return ""
+	return file_api_refiner_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RefineResponse) GetInputTokens() int32 {
@@ -849,6 +896,27 @@ func (x *RefineResponse) GetPendingSummaryJobIds() []string {
 	return nil
 }
 
+func (x *RefineResponse) GetSystem() string {
+	if x != nil {
+		return x.System
+	}
+	return ""
+}
+
+func (x *RefineResponse) GetMessages() []*Message {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+func (x *RefineResponse) GetMemory() *Memory {
+	if x != nil {
+		return x.Memory
+	}
+	return nil
+}
+
 type PageInRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PageKeys      []string               `protobuf:"bytes,1,rep,name=page_keys,json=pageKeys,proto3" json:"page_keys,omitempty"`
@@ -858,7 +926,7 @@ type PageInRequest struct {
 
 func (x *PageInRequest) Reset() {
 	*x = PageInRequest{}
-	mi := &file_api_refiner_proto_msgTypes[10]
+	mi := &file_api_refiner_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -870,7 +938,7 @@ func (x *PageInRequest) String() string {
 func (*PageInRequest) ProtoMessage() {}
 
 func (x *PageInRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[10]
+	mi := &file_api_refiner_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -883,7 +951,7 @@ func (x *PageInRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageInRequest.ProtoReflect.Descriptor instead.
 func (*PageInRequest) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{10}
+	return file_api_refiner_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *PageInRequest) GetPageKeys() []string {
@@ -917,7 +985,7 @@ type SummaryArtifact struct {
 
 func (x *SummaryArtifact) Reset() {
 	*x = SummaryArtifact{}
-	mi := &file_api_refiner_proto_msgTypes[11]
+	mi := &file_api_refiner_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -929,7 +997,7 @@ func (x *SummaryArtifact) String() string {
 func (*SummaryArtifact) ProtoMessage() {}
 
 func (x *SummaryArtifact) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[11]
+	mi := &file_api_refiner_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -942,7 +1010,7 @@ func (x *SummaryArtifact) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SummaryArtifact.ProtoReflect.Descriptor instead.
 func (*SummaryArtifact) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{11}
+	return file_api_refiner_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *SummaryArtifact) GetArtifactId() string {
@@ -1070,7 +1138,7 @@ type StoredPage struct {
 
 func (x *StoredPage) Reset() {
 	*x = StoredPage{}
-	mi := &file_api_refiner_proto_msgTypes[12]
+	mi := &file_api_refiner_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1082,7 +1150,7 @@ func (x *StoredPage) String() string {
 func (*StoredPage) ProtoMessage() {}
 
 func (x *StoredPage) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[12]
+	mi := &file_api_refiner_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1095,7 +1163,7 @@ func (x *StoredPage) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StoredPage.ProtoReflect.Descriptor instead.
 func (*StoredPage) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{12}
+	return file_api_refiner_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *StoredPage) GetKey() string {
@@ -1142,7 +1210,7 @@ type PageInResponse struct {
 
 func (x *PageInResponse) Reset() {
 	*x = PageInResponse{}
-	mi := &file_api_refiner_proto_msgTypes[13]
+	mi := &file_api_refiner_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1154,7 +1222,7 @@ func (x *PageInResponse) String() string {
 func (*PageInResponse) ProtoMessage() {}
 
 func (x *PageInResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_api_refiner_proto_msgTypes[13]
+	mi := &file_api_refiner_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1167,7 +1235,7 @@ func (x *PageInResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PageInResponse.ProtoReflect.Descriptor instead.
 func (*PageInResponse) Descriptor() ([]byte, []int) {
-	return file_api_refiner_proto_rawDescGZIP(), []int{13}
+	return file_api_refiner_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *PageInResponse) GetPages() []*StoredPage {
@@ -1206,18 +1274,22 @@ const file_api_refiner_proto_rawDesc = "" +
 	"request_id\x18\x04 \x01(\tR\trequestId\"Q\n" +
 	"\vModelConfig\x12\x14\n" +
 	"\x05model\x18\x01 \x01(\tR\x05model\x12,\n" +
-	"\x12max_context_tokens\x18\x02 \x01(\x05R\x10maxContextTokens\"\x9d\x02\n" +
-	"\rRefineRequest\x12/\n" +
-	"\bmessages\x18\x01 \x03(\v2\x13.refiner.v1.MessageR\bmessages\x123\n" +
+	"\x12max_context_tokens\x18\x02 \x01(\x05R\x10maxContextTokens\"=\n" +
+	"\x06Memory\x123\n" +
 	"\n" +
-	"rag_chunks\x18\x02 \x03(\v2\x14.refiner.v1.RagChunkR\tragChunks\x12-\n" +
+	"rag_chunks\x18\x01 \x03(\v2\x14.refiner.v1.RagChunkR\tragChunks\"\xbe\x02\n" +
+	"\rRefineRequest\x12/\n" +
+	"\bmessages\x18\x01 \x03(\v2\x13.refiner.v1.MessageR\bmessages\x12-\n" +
 	"\x05model\x18\x03 \x01(\v2\x17.refiner.v1.ModelConfigR\x05model\x12!\n" +
 	"\ftoken_budget\x18\x04 \x01(\x05R\vtokenBudget\x12\x16\n" +
 	"\x06policy\x18\x05 \x01(\tR\x06policy\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x06 \x01(\tR\tsessionId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\a \x01(\tR\trequestId\"\xdc\x01\n" +
+	"request_id\x18\a \x01(\tR\trequestId\x12\x16\n" +
+	"\x06system\x18\b \x01(\tR\x06system\x12*\n" +
+	"\x06memory\x18\t \x01(\v2\x12.refiner.v1.MemoryR\x06memoryJ\x04\b\x02\x10\x03R\n" +
+	"rag_chunks\"\xdc\x01\n" +
 	"\x15ProcessorCapabilities\x12\x1e\n" +
 	"\n" +
 	"aggressive\x18\x01 \x01(\bR\n" +
@@ -1245,9 +1317,8 @@ const file_api_refiner_proto_rawDesc = "" +
 	"\bsemantic\x18\a \x01(\v2\x1d.refiner.v1.StepSemanticAuditR\bsemantic\x1a:\n" +
 	"\fDetailsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xc6\x03\n" +
-	"\x0eRefineResponse\x12)\n" +
-	"\x10optimized_prompt\x18\x01 \x01(\tR\x0foptimizedPrompt\x12!\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa8\x04\n" +
+	"\x0eRefineResponse\x12!\n" +
 	"\finput_tokens\x18\x02 \x01(\x05R\vinputTokens\x12#\n" +
 	"\routput_tokens\x18\x03 \x01(\x05R\foutputTokens\x12-\n" +
 	"\x06audits\x18\x04 \x03(\v2\x15.refiner.v1.StepAuditR\x06audits\x129\n" +
@@ -1255,10 +1326,14 @@ const file_api_refiner_proto_rawDesc = "" +
 	"\bmetadata\x18\x06 \x03(\v2(.refiner.v1.RefineResponse.MetadataEntryR\bmetadata\x12\x1d\n" +
 	"\n" +
 	"budget_met\x18\a \x01(\bR\tbudgetMet\x125\n" +
-	"\x17pending_summary_job_ids\x18\b \x03(\tR\x14pendingSummaryJobIds\x1a;\n" +
+	"\x17pending_summary_job_ids\x18\b \x03(\tR\x14pendingSummaryJobIds\x12\x16\n" +
+	"\x06system\x18\t \x01(\tR\x06system\x12/\n" +
+	"\bmessages\x18\n" +
+	" \x03(\v2\x13.refiner.v1.MessageR\bmessages\x12*\n" +
+	"\x06memory\x18\v \x01(\v2\x12.refiner.v1.MemoryR\x06memory\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\",\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01J\x04\b\x01\x10\x02R\x10optimized_prompt\",\n" +
 	"\rPageInRequest\x12\x1b\n" +
 	"\tpage_keys\x18\x01 \x03(\tR\bpageKeys\"\xc0\x04\n" +
 	"\x0fSummaryArtifact\x12\x1f\n" +
@@ -1321,7 +1396,7 @@ func file_api_refiner_proto_rawDescGZIP() []byte {
 }
 
 var file_api_refiner_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_api_refiner_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_api_refiner_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_api_refiner_proto_goTypes = []any{
 	(FragmentType)(0),             // 0: refiner.v1.FragmentType
 	(*Message)(nil),               // 1: refiner.v1.Message
@@ -1329,44 +1404,48 @@ var file_api_refiner_proto_goTypes = []any{
 	(*RagChunk)(nil),              // 3: refiner.v1.RagChunk
 	(*PagedChunk)(nil),            // 4: refiner.v1.PagedChunk
 	(*ModelConfig)(nil),           // 5: refiner.v1.ModelConfig
-	(*RefineRequest)(nil),         // 6: refiner.v1.RefineRequest
-	(*ProcessorCapabilities)(nil), // 7: refiner.v1.ProcessorCapabilities
-	(*StepSemanticAudit)(nil),     // 8: refiner.v1.StepSemanticAudit
-	(*StepAudit)(nil),             // 9: refiner.v1.StepAudit
-	(*RefineResponse)(nil),        // 10: refiner.v1.RefineResponse
-	(*PageInRequest)(nil),         // 11: refiner.v1.PageInRequest
-	(*SummaryArtifact)(nil),       // 12: refiner.v1.SummaryArtifact
-	(*StoredPage)(nil),            // 13: refiner.v1.StoredPage
-	(*PageInResponse)(nil),        // 14: refiner.v1.PageInResponse
-	nil,                           // 15: refiner.v1.StepAudit.DetailsEntry
-	nil,                           // 16: refiner.v1.RefineResponse.MetadataEntry
-	(*timestamppb.Timestamp)(nil), // 17: google.protobuf.Timestamp
+	(*Memory)(nil),                // 6: refiner.v1.Memory
+	(*RefineRequest)(nil),         // 7: refiner.v1.RefineRequest
+	(*ProcessorCapabilities)(nil), // 8: refiner.v1.ProcessorCapabilities
+	(*StepSemanticAudit)(nil),     // 9: refiner.v1.StepSemanticAudit
+	(*StepAudit)(nil),             // 10: refiner.v1.StepAudit
+	(*RefineResponse)(nil),        // 11: refiner.v1.RefineResponse
+	(*PageInRequest)(nil),         // 12: refiner.v1.PageInRequest
+	(*SummaryArtifact)(nil),       // 13: refiner.v1.SummaryArtifact
+	(*StoredPage)(nil),            // 14: refiner.v1.StoredPage
+	(*PageInResponse)(nil),        // 15: refiner.v1.PageInResponse
+	nil,                           // 16: refiner.v1.StepAudit.DetailsEntry
+	nil,                           // 17: refiner.v1.RefineResponse.MetadataEntry
+	(*timestamppb.Timestamp)(nil), // 18: google.protobuf.Timestamp
 }
 var file_api_refiner_proto_depIdxs = []int32{
 	0,  // 0: refiner.v1.RagFragment.type:type_name -> refiner.v1.FragmentType
 	2,  // 1: refiner.v1.RagChunk.fragments:type_name -> refiner.v1.RagFragment
-	1,  // 2: refiner.v1.RefineRequest.messages:type_name -> refiner.v1.Message
-	3,  // 3: refiner.v1.RefineRequest.rag_chunks:type_name -> refiner.v1.RagChunk
+	3,  // 2: refiner.v1.Memory.rag_chunks:type_name -> refiner.v1.RagChunk
+	1,  // 3: refiner.v1.RefineRequest.messages:type_name -> refiner.v1.Message
 	5,  // 4: refiner.v1.RefineRequest.model:type_name -> refiner.v1.ModelConfig
-	15, // 5: refiner.v1.StepAudit.details:type_name -> refiner.v1.StepAudit.DetailsEntry
-	7,  // 6: refiner.v1.StepAudit.capabilities:type_name -> refiner.v1.ProcessorCapabilities
-	8,  // 7: refiner.v1.StepAudit.semantic:type_name -> refiner.v1.StepSemanticAudit
-	9,  // 8: refiner.v1.RefineResponse.audits:type_name -> refiner.v1.StepAudit
-	4,  // 9: refiner.v1.RefineResponse.paged_chunks:type_name -> refiner.v1.PagedChunk
-	16, // 10: refiner.v1.RefineResponse.metadata:type_name -> refiner.v1.RefineResponse.MetadataEntry
-	17, // 11: refiner.v1.SummaryArtifact.created_at:type_name -> google.protobuf.Timestamp
-	17, // 12: refiner.v1.SummaryArtifact.expires_at:type_name -> google.protobuf.Timestamp
-	12, // 13: refiner.v1.StoredPage.summary_artifact:type_name -> refiner.v1.SummaryArtifact
-	13, // 14: refiner.v1.PageInResponse.pages:type_name -> refiner.v1.StoredPage
-	6,  // 15: refiner.v1.RefinerService.Refine:input_type -> refiner.v1.RefineRequest
-	11, // 16: refiner.v1.RefinerService.PageIn:input_type -> refiner.v1.PageInRequest
-	10, // 17: refiner.v1.RefinerService.Refine:output_type -> refiner.v1.RefineResponse
-	14, // 18: refiner.v1.RefinerService.PageIn:output_type -> refiner.v1.PageInResponse
-	17, // [17:19] is the sub-list for method output_type
-	15, // [15:17] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	6,  // 5: refiner.v1.RefineRequest.memory:type_name -> refiner.v1.Memory
+	16, // 6: refiner.v1.StepAudit.details:type_name -> refiner.v1.StepAudit.DetailsEntry
+	8,  // 7: refiner.v1.StepAudit.capabilities:type_name -> refiner.v1.ProcessorCapabilities
+	9,  // 8: refiner.v1.StepAudit.semantic:type_name -> refiner.v1.StepSemanticAudit
+	10, // 9: refiner.v1.RefineResponse.audits:type_name -> refiner.v1.StepAudit
+	4,  // 10: refiner.v1.RefineResponse.paged_chunks:type_name -> refiner.v1.PagedChunk
+	17, // 11: refiner.v1.RefineResponse.metadata:type_name -> refiner.v1.RefineResponse.MetadataEntry
+	1,  // 12: refiner.v1.RefineResponse.messages:type_name -> refiner.v1.Message
+	6,  // 13: refiner.v1.RefineResponse.memory:type_name -> refiner.v1.Memory
+	18, // 14: refiner.v1.SummaryArtifact.created_at:type_name -> google.protobuf.Timestamp
+	18, // 15: refiner.v1.SummaryArtifact.expires_at:type_name -> google.protobuf.Timestamp
+	13, // 16: refiner.v1.StoredPage.summary_artifact:type_name -> refiner.v1.SummaryArtifact
+	14, // 17: refiner.v1.PageInResponse.pages:type_name -> refiner.v1.StoredPage
+	7,  // 18: refiner.v1.RefinerService.Refine:input_type -> refiner.v1.RefineRequest
+	12, // 19: refiner.v1.RefinerService.PageIn:input_type -> refiner.v1.PageInRequest
+	11, // 20: refiner.v1.RefinerService.Refine:output_type -> refiner.v1.RefineResponse
+	15, // 21: refiner.v1.RefinerService.PageIn:output_type -> refiner.v1.PageInResponse
+	20, // [20:22] is the sub-list for method output_type
+	18, // [18:20] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_api_refiner_proto_init() }
@@ -1380,7 +1459,7 @@ func file_api_refiner_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_refiner_proto_rawDesc), len(file_api_refiner_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

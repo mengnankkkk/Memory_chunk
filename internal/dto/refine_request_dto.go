@@ -3,11 +3,16 @@ package dto
 type RefineRequest struct {
 	SessionID   string
 	RequestID   string
+	System      string
 	Messages    []Message
-	RAGChunks   []RAGChunk
+	Memory      Memory
 	Model       Model
 	TokenBudget int
 	Policy      string
+}
+
+type Memory struct {
+	RAGChunks []RAGChunk
 }
 
 type Message struct {

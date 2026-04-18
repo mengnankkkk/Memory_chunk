@@ -100,7 +100,7 @@ Redis 集成测试重点：
 
 gRPC 服务集成测试重点：
 
-- `Refine` 在合法请求下返回 `optimized_prompt`、`audits`、`budget_met`
+- `Refine` 在合法请求下返回结构化 `system + messages + memory`、`audits`、`budget_met`
 - `Refine` 在未知 policy、无效 budget 下返回正确错误
 - `PageIn` 在 summary 已存在时返回 `is_summary = true`
 - `PageIn` 在 page 不存在时返回 `NotFound`

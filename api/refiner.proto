@@ -49,14 +49,21 @@ message ModelConfig {
   int32 max_context_tokens = 2;
 }
 
+message Memory {
+  repeated RagChunk rag_chunks = 1;
+}
+
 message RefineRequest {
   repeated Message messages = 1;
-  repeated RagChunk rag_chunks = 2;
+  reserved 2;
+  reserved "rag_chunks";
   ModelConfig model = 3;
   int32 token_budget = 4;
   string policy = 5;
   string session_id = 6;
   string request_id = 7;
+  string system = 8;
+  Memory memory = 9;
 }
 
 message ProcessorCapabilities {
@@ -88,7 +95,8 @@ message StepAudit {
 }
 
 message RefineResponse {
-  string optimized_prompt = 1;
+  reserved 1;
+  reserved "optimized_prompt";
   int32 input_tokens = 2;
   int32 output_tokens = 3;
   repeated StepAudit audits = 4;
@@ -96,6 +104,9 @@ message RefineResponse {
   map<string, string> metadata = 6;
   bool budget_met = 7;
   repeated string pending_summary_job_ids = 8;
+  string system = 9;
+  repeated Message messages = 10;
+  Memory memory = 11;
 }
 
 message PageInRequest {

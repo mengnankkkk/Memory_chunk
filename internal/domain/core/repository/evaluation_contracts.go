@@ -24,12 +24,43 @@ type TraceEvaluation struct {
 	OutputTokens     int                      `json:"output_tokens"`
 	SavedTokens      int                      `json:"saved_tokens"`
 	CompressionRatio float64                  `json:"compression_ratio"`
+	InputContext     TraceEvaluationContext   `json:"input_context,omitempty"`
+	OutputContext    TraceEvaluationContext   `json:"output_context,omitempty"`
 	BeforeContext    string                   `json:"before_context,omitempty"`
 	AfterContext     string                   `json:"after_context,omitempty"`
 	Metadata         map[string]string        `json:"metadata,omitempty"`
 	Steps            []TraceEvaluationStep    `json:"steps,omitempty"`
 	PagedChunks      []TraceEvaluationPageSet `json:"paged_chunks,omitempty"`
 	CreatedAt        time.Time                `json:"created_at"`
+}
+
+type TraceEvaluationContext struct {
+	System   string                         `json:"system,omitempty"`
+	Messages []TraceEvaluationMessage       `json:"messages,omitempty"`
+	Memory   TraceEvaluationMemory          `json:"memory,omitempty"`
+}
+
+type TraceEvaluationMessage struct {
+	Role    string `json:"role,omitempty"`
+	Content string `json:"content,omitempty"`
+}
+
+type TraceEvaluationMemory struct {
+	RAG []TraceEvaluationRAGChunk `json:"rag,omitempty"`
+}
+
+type TraceEvaluationRAGChunk struct {
+	ID        string                       `json:"id,omitempty"`
+	Source    string                       `json:"source,omitempty"`
+	Sources   []string                     `json:"sources,omitempty"`
+	Fragments []TraceEvaluationRAGFragment `json:"fragments,omitempty"`
+	PageRefs  []string                     `json:"page_refs,omitempty"`
+}
+
+type TraceEvaluationRAGFragment struct {
+	Type     string `json:"type,omitempty"`
+	Content  string `json:"content,omitempty"`
+	Language string `json:"language,omitempty"`
 }
 
 type TraceEvaluationPageSet struct {

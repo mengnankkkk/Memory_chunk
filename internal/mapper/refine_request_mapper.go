@@ -15,8 +15,9 @@ func MapRefineProtoRequestToDTO(req *refinerv1.RefineRequest) *dto.RefineRequest
 	return &dto.RefineRequest{
 		SessionID:   sessionID,
 		RequestID:   requestID,
+		System:      mapProtoSystem(req),
 		Messages:    mapProtoMessages(req),
-		RAGChunks:   mapProtoChunks(req),
+		Memory:      dto.Memory{RAGChunks: mapProtoChunks(req)},
 		Model:       mapProtoModel(req),
 		TokenBudget: int(req.GetTokenBudget()),
 		Policy:      strings.TrimSpace(req.GetPolicy()),
@@ -53,6 +54,9 @@ func MapPageInProtoRequestToDTO(req *refinerv1.PageInRequest) *dto.PageInRequest
 }
 
 func mapProtoMessages(req *refinerv1.RefineRequest) []dto.Message {
+	if req == nil {
+		return nil
+	}
 	messages := make([]dto.Message, 0, len(req.GetMessages()))
 	for _, item := range req.GetMessages() {
 		messages = append(messages, dto.Message{
@@ -64,7 +68,13 @@ func mapProtoMessages(req *refinerv1.RefineRequest) []dto.Message {
 }
 
 func mapDTOMessages(req *dto.RefineRequest) []core.Message {
-	messages := make([]core.Message, 0, len(req.Messages))
+	messages := make([]core.Message, 0, len(req.Messages)+1)
+	if system := strings.TrimSpace(req.System); system != "" {
+		messages = append(messages, core.Message{
+			Role:    "system",
+			Content: system,
+		})
+	}
 	for _, item := range req.Messages {
 		messages = append(messages, core.Message{
 			Role:    item.Role,
@@ -75,8 +85,9 @@ func mapDTOMessages(req *dto.RefineRequest) []core.Message {
 }
 
 func mapProtoChunks(req *refinerv1.RefineRequest) []dto.RAGChunk {
-	chunks := make([]dto.RAGChunk, 0, len(req.GetRagChunks()))
-	for _, item := range req.GetRagChunks() {
+	protoChunks := protoMemoryChunks(req)
+	chunks := make([]dto.RAGChunk, 0, len(protoChunks))
+	for _, item := range protoChunks {
 		chunks = append(chunks, dto.RAGChunk{
 			ID:        item.GetId(),
 			Source:    item.GetSource(),
@@ -88,8 +99,8 @@ func mapProtoChunks(req *refinerv1.RefineRequest) []dto.RAGChunk {
 }
 
 func mapDTOChunks(req *dto.RefineRequest) []core.RAGChunk {
-	chunks := make([]core.RAGChunk, 0, len(req.RAGChunks))
-	for _, item := range req.RAGChunks {
+	chunks := make([]core.RAGChunk, 0, len(req.Memory.RAGChunks))
+	for _, item := range req.Memory.RAGChunks {
 		chunks = append(chunks, core.RAGChunk{
 			ID:        item.ID,
 			Source:    item.Source,
@@ -174,4 +185,21 @@ func normalizeRefineIDs(session string, request string) (sessionID string, reque
 		sessionID = "session-" + requestID
 	}
 	return sessionID, requestID
+}
+
+func mapProtoSystem(req *refinerv1.RefineRequest) string {
+	if req == nil {
+		return ""
+	}
+	return strings.TrimSpace(req.GetSystem())
+}
+
+func protoMemoryChunks(req *refinerv1.RefineRequest) []*refinerv1.RagChunk {
+	if req == nil {
+		return nil
+	}
+	if memory := req.GetMemory(); memory != nil {
+		return memory.GetRagChunks()
+	}
+	return nil
 }

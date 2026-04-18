@@ -73,7 +73,7 @@ func (s *RefinerApplicationService) RefineDTO(ctx context.Context, req *dto.Refi
 		attribute.String("refiner.session_id", req.SessionID),
 		attribute.String("refiner.request_id", req.RequestID),
 		attribute.Int("refiner.message_count", len(req.Messages)),
-		attribute.Int("refiner.rag_chunk_count", len(req.RAGChunks)),
+		attribute.Int("refiner.rag_chunk_count", len(req.Memory.RAGChunks)),
 	)
 	policy, err := s.resolvePolicy(req.Policy)
 	if err != nil {
@@ -253,11 +253,13 @@ func (s *RefinerApplicationService) saveTraceEvaluation(
 		Budget:           engineReq.Budget,
 		BudgetMet:        resp.BudgetMet,
 		MessageCount:     len(req.Messages),
-		RAGChunkCount:    len(req.RAGChunks),
+		RAGChunkCount:    len(req.Memory.RAGChunks),
 		InputTokens:      resp.InputTokens,
 		OutputTokens:     resp.OutputTokens,
 		SavedTokens:      maxInt(0, resp.InputTokens-resp.OutputTokens),
 		CompressionRatio: compressionRatio(resp.InputTokens, resp.OutputTokens),
+		InputContext:     mapEvaluationInputContext(req),
+		OutputContext:    mapEvaluationOutputContext(resp),
 		BeforeContext:    beforeContext,
 		AfterContext:     resp.OptimizedPrompt,
 		Metadata:         cloneStringMap(resp.Metadata),
@@ -266,6 +268,127 @@ func (s *RefinerApplicationService) saveTraceEvaluation(
 		CreatedAt:        time.Now().UTC(),
 	}
 	return s.evaluationRepo.SaveTraceEvaluation(ctx, snapshot)
+}
+
+func mapEvaluationInputContext(req *dto.RefineRequest) repository.TraceEvaluationContext {
+	if req == nil {
+		return repository.TraceEvaluationContext{}
+	}
+	return repository.TraceEvaluationContext{
+		System:   strings.TrimSpace(req.System),
+		Messages: mapEvaluationMessagesFromDTO(req.Messages),
+		Memory: repository.TraceEvaluationMemory{
+			RAG: mapEvaluationDTORAGChunks(req.Memory.RAGChunks),
+		},
+	}
+}
+
+func mapEvaluationOutputContext(resp *core.RefineResponse) repository.TraceEvaluationContext {
+	if resp == nil {
+		return repository.TraceEvaluationContext{}
+	}
+	systemMessages := make([]string, 0)
+	messages := make([]repository.TraceEvaluationMessage, 0, len(resp.Messages))
+	for _, item := range resp.Messages {
+		if strings.TrimSpace(item.Content) == "" {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(item.Role), "system") {
+			systemMessages = append(systemMessages, strings.TrimSpace(item.Content))
+			continue
+		}
+		messages = append(messages, repository.TraceEvaluationMessage{
+			Role:    strings.TrimSpace(item.Role),
+			Content: strings.TrimSpace(item.Content),
+		})
+	}
+	return repository.TraceEvaluationContext{
+		System:   strings.TrimSpace(strings.Join(systemMessages, "\n\n")),
+		Messages: messages,
+		Memory: repository.TraceEvaluationMemory{
+			RAG: mapEvaluationRAGChunks(resp.RAGChunks),
+		},
+	}
+}
+
+func mapEvaluationMessagesFromDTO(items []dto.Message) []repository.TraceEvaluationMessage {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]repository.TraceEvaluationMessage, 0, len(items))
+	for _, item := range items {
+		if strings.TrimSpace(item.Content) == "" {
+			continue
+		}
+		out = append(out, repository.TraceEvaluationMessage{
+			Role:    strings.TrimSpace(item.Role),
+			Content: strings.TrimSpace(item.Content),
+		})
+	}
+	return out
+}
+
+func mapEvaluationRAGChunks(items []core.RAGChunk) []repository.TraceEvaluationRAGChunk {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]repository.TraceEvaluationRAGChunk, 0, len(items))
+	for _, item := range items {
+		out = append(out, repository.TraceEvaluationRAGChunk{
+			ID:        strings.TrimSpace(item.ID),
+			Source:    strings.TrimSpace(item.Source),
+			Sources:   append([]string(nil), item.Sources...),
+			Fragments: mapEvaluationRAGFragments(item.Fragments),
+			PageRefs:  append([]string(nil), item.PageRefs...),
+		})
+	}
+	return out
+}
+
+func mapEvaluationRAGFragments(items []core.RAGFragment) []repository.TraceEvaluationRAGFragment {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]repository.TraceEvaluationRAGFragment, 0, len(items))
+	for _, item := range items {
+		out = append(out, repository.TraceEvaluationRAGFragment{
+			Type:     string(item.Type),
+			Content:  strings.TrimSpace(item.Content),
+			Language: strings.TrimSpace(item.Language),
+		})
+	}
+	return out
+}
+
+func mapEvaluationDTORAGChunks(items []dto.RAGChunk) []repository.TraceEvaluationRAGChunk {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]repository.TraceEvaluationRAGChunk, 0, len(items))
+	for _, item := range items {
+		out = append(out, repository.TraceEvaluationRAGChunk{
+			ID:        strings.TrimSpace(item.ID),
+			Source:    strings.TrimSpace(item.Source),
+			Sources:   append([]string(nil), item.Sources...),
+			Fragments: mapEvaluationDTORAGFragments(item.Fragments),
+		})
+	}
+	return out
+}
+
+func mapEvaluationDTORAGFragments(items []dto.RAGFragment) []repository.TraceEvaluationRAGFragment {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]repository.TraceEvaluationRAGFragment, 0, len(items))
+	for _, item := range items {
+		out = append(out, repository.TraceEvaluationRAGFragment{
+			Type:     strings.TrimSpace(item.Type),
+			Content:  strings.TrimSpace(item.Content),
+			Language: strings.TrimSpace(item.Language),
+		})
+	}
+	return out
 }
 
 func mapEvaluationSteps(items []core.StepAudit) []repository.TraceEvaluationStep {

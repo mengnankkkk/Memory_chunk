@@ -4,6 +4,7 @@ import (
 	refinerv1 "context-refiner/api/refinerv1"
 	"context-refiner/internal/domain/core"
 	"context-refiner/internal/dto"
+	"strings"
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -11,6 +12,9 @@ import (
 func MapRefineDomainResponseToDTO(resp *core.RefineResponse) *dto.RefineResponse {
 	return &dto.RefineResponse{
 		OptimizedPrompt:      resp.OptimizedPrompt,
+		System:               mapDomainResponseSystem(resp),
+		Messages:             mapDomainResponseMessages(resp),
+		Memory:               dto.Memory{RAGChunks: mapDomainResponseChunks(resp)},
 		InputTokens:          resp.InputTokens,
 		OutputTokens:         resp.OutputTokens,
 		Audits:               mapDomainAudits(resp.Audits),
@@ -23,7 +27,9 @@ func MapRefineDomainResponseToDTO(resp *core.RefineResponse) *dto.RefineResponse
 
 func MapRefineDTOToProtoResponse(resp *dto.RefineResponse) *refinerv1.RefineResponse {
 	return &refinerv1.RefineResponse{
-		OptimizedPrompt:      resp.OptimizedPrompt,
+		System:               resp.System,
+		Messages:             mapDTOResponseMessages(resp.Messages),
+		Memory:               mapDTOResponseMemory(resp.Memory),
 		InputTokens:          int32(resp.InputTokens),
 		OutputTokens:         int32(resp.OutputTokens),
 		Audits:               mapDTOAudits(resp.Audits),
@@ -105,6 +111,128 @@ func mapDomainAudits(items []core.StepAudit) []dto.StepAudit {
 		})
 	}
 	return audits
+}
+
+func mapDomainResponseSystem(resp *core.RefineResponse) string {
+	if resp == nil {
+		return ""
+	}
+	parts := make([]string, 0)
+	for _, item := range resp.Messages {
+		if normalizeMessageRole(item.Role) != "system" {
+			continue
+		}
+		content := strings.TrimSpace(item.Content)
+		if content == "" {
+			continue
+		}
+		parts = append(parts, content)
+	}
+	return strings.TrimSpace(strings.Join(parts, "\n\n"))
+}
+
+func mapDomainResponseMessages(resp *core.RefineResponse) []dto.Message {
+	if resp == nil {
+		return nil
+	}
+	messages := make([]dto.Message, 0, len(resp.Messages))
+	for _, item := range resp.Messages {
+		if normalizeMessageRole(item.Role) == "system" {
+			continue
+		}
+		content := strings.TrimSpace(item.Content)
+		if content == "" {
+			continue
+		}
+		messages = append(messages, dto.Message{
+			Role:    strings.TrimSpace(item.Role),
+			Content: content,
+		})
+	}
+	return messages
+}
+
+func mapDomainResponseChunks(resp *core.RefineResponse) []dto.RAGChunk {
+	if resp == nil {
+		return nil
+	}
+	chunks := make([]dto.RAGChunk, 0, len(resp.RAGChunks))
+	for _, item := range resp.RAGChunks {
+		chunks = append(chunks, dto.RAGChunk{
+			ID:        strings.TrimSpace(item.ID),
+			Source:    strings.TrimSpace(item.Source),
+			Sources:   append([]string(nil), item.Sources...),
+			Fragments: mapDomainResponseFragments(item.Fragments),
+		})
+	}
+	return chunks
+}
+
+func mapDomainResponseFragments(items []core.RAGFragment) []dto.RAGFragment {
+	if len(items) == 0 {
+		return nil
+	}
+	fragments := make([]dto.RAGFragment, 0, len(items))
+	for _, item := range items {
+		fragments = append(fragments, dto.RAGFragment{
+			Type:     string(item.Type),
+			Content:  strings.TrimSpace(item.Content),
+			Language: strings.TrimSpace(item.Language),
+		})
+	}
+	return fragments
+}
+
+func mapDTOResponseMessages(items []dto.Message) []*refinerv1.Message {
+	if len(items) == 0 {
+		return nil
+	}
+	messages := make([]*refinerv1.Message, 0, len(items))
+	for _, item := range items {
+		messages = append(messages, &refinerv1.Message{
+			Role:    item.Role,
+			Content: item.Content,
+		})
+	}
+	return messages
+}
+
+func mapDTOResponseMemory(memory dto.Memory) *refinerv1.Memory {
+	if len(memory.RAGChunks) == 0 {
+		return nil
+	}
+	return &refinerv1.Memory{RagChunks: mapDTOResponseChunks(memory.RAGChunks)}
+}
+
+func mapDTOResponseChunks(items []dto.RAGChunk) []*refinerv1.RagChunk {
+	if len(items) == 0 {
+		return nil
+	}
+	chunks := make([]*refinerv1.RagChunk, 0, len(items))
+	for _, item := range items {
+		chunks = append(chunks, &refinerv1.RagChunk{
+			Id:        item.ID,
+			Source:    item.Source,
+			Fragments: mapDTOResponseFragments(item.Fragments),
+			Sources:   append([]string(nil), item.Sources...),
+		})
+	}
+	return chunks
+}
+
+func mapDTOResponseFragments(items []dto.RAGFragment) []*refinerv1.RagFragment {
+	if len(items) == 0 {
+		return nil
+	}
+	fragments := make([]*refinerv1.RagFragment, 0, len(items))
+	for _, item := range items {
+		fragments = append(fragments, &refinerv1.RagFragment{
+			Type:     mapFragmentTypeToProto(item.Type),
+			Content:  item.Content,
+			Language: item.Language,
+		})
+	}
+	return fragments
 }
 
 func mapDTOAudits(items []dto.StepAudit) []*refinerv1.StepAudit {

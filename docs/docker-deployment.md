@@ -74,10 +74,12 @@ curl -X POST http://localhost:18080/api/refine \
   -d '{
     "system": "你是代码助手",
     "messages": [{"role":"user","content":"帮我排查问题"}],
-    "rag": ["日志片段"],
+    "memory": {"rag": ["日志片段"]},
     "budget": 200
   }'
 ```
+
+返回结果中的核心内容已经是结构化 `system + messages + memory`。调用方应从 JSON 中提取这三块，再按自己的下游模型 API 组装最终请求。
 
 ## 端口映射
 

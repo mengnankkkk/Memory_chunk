@@ -2,6 +2,9 @@ package dto
 
 type RefineResponse struct {
 	OptimizedPrompt      string
+	System               string
+	Messages             []Message
+	Memory               Memory
 	InputTokens          int
 	OutputTokens         int
 	Audits               []StepAudit

@@ -405,7 +405,8 @@ function renderEvaluation(traceId, detail, evaluation) {
     evaluationKVCacheDetail.innerHTML = renderKVCacheMetrics(evaluation.metadata || {}, evaluation);
   }
 
-  contextCompare.innerHTML = renderDiffPanes(
+  contextCompare.innerHTML = renderContextCompare(
+    evaluation,
     evaluation.before_context || "",
     evaluation.after_context || "",
     inputTokens,
@@ -593,6 +594,134 @@ function shortenIdentifier(value) {
   if (!str) return "—";
   if (str.length <= 24) return str;
   return `${str.slice(0, 12)}…${str.slice(-8)}`;
+}
+
+function renderContextCompare(evaluation, before, after, beforeTokens, afterTokens) {
+  const inputContext = evaluation.input_context || {};
+  const outputContext = evaluation.output_context || {};
+
+  return `
+    <div class="context-compare-stack">
+      <div class="structured-grid">
+        ${renderStructuredContextCard("输入结构", inputContext, beforeTokens)}
+        ${renderStructuredContextCard("输出结构", outputContext, afterTokens)}
+      </div>
+      <div class="raw-diff-grid">
+        ${renderDiffPanes(before, after, beforeTokens, afterTokens)}
+      </div>
+    </div>
+  `;
+}
+
+function renderStructuredContextCard(title, context, tokens) {
+  const system = String(context?.system || "").trim();
+  const messages = Array.isArray(context?.messages) ? context.messages : [];
+  const ragChunks = Array.isArray(context?.memory?.rag) ? context.memory.rag : [];
+  const summary = [
+    `System ${system ? 1 : 0}`,
+    `Messages ${messages.length}`,
+    `Memory.RAG ${ragChunks.length}`,
+    `Tokens ${Number(tokens || 0).toLocaleString()}`,
+  ].join(" · ");
+
+  return `
+    <article class="context-card structured-card">
+      <div class="context-head">
+        <div>
+          <h3>${escapeHtml(title)}</h3>
+          <p class="metric-meta">${escapeHtml(summary)}</p>
+        </div>
+      </div>
+      <div class="context-body structured-body">
+        ${renderStructuredBlock("system", system ? `<pre class="structured-text">${escapeHtml(system)}</pre>` : emptyStructured("暂无 system 内容"))}
+        ${renderStructuredBlock("messages", renderStructuredMessages(messages))}
+        ${renderStructuredBlock("memory", renderStructuredMemory(ragChunks))}
+      </div>
+    </article>
+  `;
+}
+
+function renderStructuredBlock(label, body) {
+  return `
+    <section class="structured-block">
+      <div class="structured-label">${escapeHtml(label)}</div>
+      ${body}
+    </section>
+  `;
+}
+
+function renderStructuredMessages(messages) {
+  if (!messages.length) {
+    return emptyStructured("暂无 messages");
+  }
+  return `
+    <div class="structured-list">
+      ${messages.map((message, index) => `
+        <article class="message-entry">
+          <div class="message-entry-head">
+            <span class="role-pill">${escapeHtml(formatMessageRole(message.role))}</span>
+            <span class="metric-meta">#${index + 1}</span>
+          </div>
+          <pre class="structured-text">${escapeHtml(String(message.content || "").trim() || " ")}</pre>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderStructuredMemory(ragChunks) {
+  if (!ragChunks.length) {
+    return emptyStructured("暂无 memory.rag");
+  }
+  return `
+    <div class="structured-list">
+      ${ragChunks.map((chunk, index) => {
+        const sources = Array.isArray(chunk?.sources) && chunk.sources.length
+          ? chunk.sources.join(", ")
+          : (chunk?.source || "unknown");
+        const fragments = Array.isArray(chunk?.fragments) ? chunk.fragments : [];
+        const pageRefs = Array.isArray(chunk?.page_refs) ? chunk.page_refs : [];
+        return `
+          <article class="memory-entry">
+            <div class="memory-entry-head">
+              <strong>${escapeHtml(chunk?.id || `rag-${index + 1}`)}</strong>
+              <span class="metric-meta">${escapeHtml(sources)}</span>
+            </div>
+            <div class="memory-entry-meta">
+              <span>${escapeHtml(`Fragments ${fragments.length}`)}</span>
+              <span>${escapeHtml(`Pages ${pageRefs.length}`)}</span>
+            </div>
+            <div class="fragment-list">
+              ${fragments.map((fragment) => `
+                <div class="fragment-chip">
+                  <span class="fragment-chip-type">${escapeHtml(String(fragment?.type || "body"))}</span>
+                  <span class="fragment-chip-content">${escapeHtml(truncateStructuredText(fragment?.content || "", 120))}</span>
+                </div>
+              `).join("") || `<div class="metric-meta">无 fragment</div>`}
+            </div>
+          </article>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function emptyStructured(label) {
+  return `<div class="structured-empty">${escapeHtml(label)}</div>`;
+}
+
+function formatMessageRole(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (!normalized) return "USER";
+  return normalized.toUpperCase();
+}
+
+function truncateStructuredText(value, maxLength) {
+  const text = String(value || "").trim();
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength)}...`;
 }
 
 function renderDiffPanes(before, after, beforeTokens, afterTokens) {

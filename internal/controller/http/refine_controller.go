@@ -20,17 +20,21 @@ func NewRefineController(svc *service.RefinerApplicationService) *RefineControll
 	return &RefineController{service: svc}
 }
 
-// 简化的对外接入入参：system + messages + rag 三件套，其余都是可选项。
+// 简化的对外接入入参：system + messages + memory 三件套，其余都是可选项。
 type simpleRefineRequest struct {
 	System    string            `json:"system"`
 	Messages  []simpleMessage   `json:"messages"`
-	RAG       json.RawMessage   `json:"rag"`
+	Memory    *simpleMemory     `json:"memory"`
 	Budget    int               `json:"budget"`
 	Policy    string            `json:"policy"`
 	Model     json.RawMessage   `json:"model"`
 	SessionID string            `json:"session_id"`
 	RequestID string            `json:"request_id"`
 	Metadata  map[string]string `json:"metadata"`
+}
+
+type simpleMemory struct {
+	RAG json.RawMessage `json:"rag"`
 }
 
 type simpleMessage struct {
@@ -51,16 +55,35 @@ type simpleModel struct {
 }
 
 type simpleRefineResponse struct {
-	Prompt           string  `json:"prompt"`
-	TraceID          string  `json:"trace_id"`
-	RequestID        string  `json:"request_id"`
-	SessionID        string  `json:"session_id"`
-	InputTokens      int     `json:"input_tokens"`
-	OutputTokens     int     `json:"output_tokens"`
-	SavedTokens      int     `json:"saved_tokens"`
-	CompressionRatio float64 `json:"compression_ratio"`
-	BudgetMet        bool    `json:"budget_met"`
-	CacheHit         bool    `json:"cache_hit"`
+	System           string                 `json:"system,omitempty"`
+	Messages         []simpleMessage        `json:"messages,omitempty"`
+	Memory           simpleStructuredMemory `json:"memory,omitempty"`
+	TraceID          string                 `json:"trace_id"`
+	RequestID        string                 `json:"request_id"`
+	SessionID        string                 `json:"session_id"`
+	InputTokens      int                    `json:"input_tokens"`
+	OutputTokens     int                    `json:"output_tokens"`
+	SavedTokens      int                    `json:"saved_tokens"`
+	CompressionRatio float64                `json:"compression_ratio"`
+	BudgetMet        bool                   `json:"budget_met"`
+	CacheHit         bool                   `json:"cache_hit"`
+}
+
+type simpleStructuredMemory struct {
+	RAG []simpleStructuredRAGChunk `json:"rag,omitempty"`
+}
+
+type simpleStructuredRAGChunk struct {
+	ID        string                      `json:"id,omitempty"`
+	Source    string                      `json:"source,omitempty"`
+	Sources   []string                    `json:"sources,omitempty"`
+	Fragments []simpleStructuredRAGFields `json:"fragments,omitempty"`
+}
+
+type simpleStructuredRAGFields struct {
+	Type     string `json:"type,omitempty"`
+	Content  string `json:"content,omitempty"`
+	Language string `json:"language,omitempty"`
 }
 
 func (c *RefineController) Handle(w http.ResponseWriter, r *http.Request) {
@@ -96,10 +119,7 @@ func (c *RefineController) Handle(w http.ResponseWriter, r *http.Request) {
 }
 
 func buildRefineDTO(in simpleRefineRequest) (*dto.RefineRequest, error) {
-	messages := make([]dto.Message, 0, len(in.Messages)+1)
-	if sys := strings.TrimSpace(in.System); sys != "" {
-		messages = append(messages, dto.Message{Role: "system", Content: sys})
-	}
+	messages := make([]dto.Message, 0, len(in.Messages))
 	for _, m := range in.Messages {
 		role := strings.TrimSpace(m.Role)
 		if role == "" {
@@ -108,7 +128,7 @@ func buildRefineDTO(in simpleRefineRequest) (*dto.RefineRequest, error) {
 		messages = append(messages, dto.Message{Role: role, Content: m.Content})
 	}
 
-	rag, err := decodeRAG(in.RAG)
+	memory, err := decodeMemory(in.Memory)
 	if err != nil {
 		return nil, err
 	}
@@ -130,12 +150,25 @@ func buildRefineDTO(in simpleRefineRequest) (*dto.RefineRequest, error) {
 	return &dto.RefineRequest{
 		SessionID:   sessionID,
 		RequestID:   requestID,
+		System:      strings.TrimSpace(in.System),
 		Messages:    messages,
-		RAGChunks:   rag,
+		Memory:      memory,
 		Model:       model,
 		TokenBudget: in.Budget,
 		Policy:      strings.TrimSpace(in.Policy),
 	}, nil
+}
+
+func decodeMemory(memory *simpleMemory) (dto.Memory, error) {
+	var raw json.RawMessage
+	if memory != nil && len(memory.RAG) > 0 {
+		raw = memory.RAG
+	}
+	rag, err := decodeRAG(raw)
+	if err != nil {
+		return dto.Memory{}, err
+	}
+	return dto.Memory{RAGChunks: rag}, nil
 }
 
 func decodeRAG(raw json.RawMessage) ([]dto.RAGChunk, error) {
@@ -164,7 +197,7 @@ func decodeRAG(raw json.RawMessage) ([]dto.RAGChunk, error) {
 	// 再尝试对象数组：[{id,source,content,type}]
 	var asItems []simpleRagItem
 	if err := json.Unmarshal(raw, &asItems); err != nil {
-		return nil, fmt.Errorf("rag 字段需要是字符串数组或对象数组：%v", err)
+		return nil, fmt.Errorf("memory.rag 字段需要是字符串数组或对象数组：%v", err)
 	}
 	out := make([]dto.RAGChunk, 0, len(asItems))
 	for i, item := range asItems {
@@ -229,7 +262,9 @@ func buildSimpleResponse(req *dto.RefineRequest, resp *dto.RefineResponse) simpl
 		traceID = resp.Metadata["trace_id"]
 	}
 	return simpleRefineResponse{
-		Prompt:           resp.OptimizedPrompt,
+		System:           resp.System,
+		Messages:         mapSimpleResponseMessages(resp.Messages),
+		Memory:           mapSimpleResponseMemory(resp.Memory),
 		TraceID:          traceID,
 		RequestID:        req.RequestID,
 		SessionID:        req.SessionID,
@@ -240,6 +275,51 @@ func buildSimpleResponse(req *dto.RefineRequest, resp *dto.RefineResponse) simpl
 		BudgetMet:        resp.BudgetMet,
 		CacheHit:         cacheHit,
 	}
+}
+
+func mapSimpleResponseMessages(items []dto.Message) []simpleMessage {
+	if len(items) == 0 {
+		return nil
+	}
+	messages := make([]simpleMessage, 0, len(items))
+	for _, item := range items {
+		messages = append(messages, simpleMessage{
+			Role:    item.Role,
+			Content: item.Content,
+		})
+	}
+	return messages
+}
+
+func mapSimpleResponseMemory(memory dto.Memory) simpleStructuredMemory {
+	if len(memory.RAGChunks) == 0 {
+		return simpleStructuredMemory{}
+	}
+	chunks := make([]simpleStructuredRAGChunk, 0, len(memory.RAGChunks))
+	for _, item := range memory.RAGChunks {
+		chunks = append(chunks, simpleStructuredRAGChunk{
+			ID:        item.ID,
+			Source:    item.Source,
+			Sources:   append([]string(nil), item.Sources...),
+			Fragments: mapSimpleResponseFragments(item.Fragments),
+		})
+	}
+	return simpleStructuredMemory{RAG: chunks}
+}
+
+func mapSimpleResponseFragments(items []dto.RAGFragment) []simpleStructuredRAGFields {
+	if len(items) == 0 {
+		return nil
+	}
+	fragments := make([]simpleStructuredRAGFields, 0, len(items))
+	for _, item := range items {
+		fragments = append(fragments, simpleStructuredRAGFields{
+			Type:     item.Type,
+			Content:  item.Content,
+			Language: item.Language,
+		})
+	}
+	return fragments
 }
 
 func randomID(n int) string {
