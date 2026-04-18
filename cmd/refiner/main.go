@@ -20,6 +20,11 @@ func main() {
 	configPath := flag.String("config", "config/service.yaml", "path to app config file")
 	flag.Parse()
 
+	// 支持环境变量覆盖配置文件路径
+	if envConfig := os.Getenv("CONFIG_FILE"); envConfig != "" {
+		*configPath = envConfig
+	}
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 

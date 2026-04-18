@@ -13,12 +13,20 @@
 
 ## 2. 当前推荐运行模式
 
-当前仓库推荐采用下面这套本机开发模式：
+当前仓库推荐采用下面这两套模式，根据你的目标选择：
+
+### 模式 A：本机开发模式
 
 - `context-refiner` 项目进程运行在宿主机
 - Redis、Prometheus、Grafana、Tempo、OTel Collector 运行在 Docker 中
 
-这样做的原因：
+### 模式 B：Docker Compose 一键部署模式
+
+- `context-refiner`、Redis、Prometheus、Grafana、Tempo、OTel Collector 全部运行在 Docker 中
+- 在仓库根目录直接执行 `docker compose up -d --build`
+- 部署完成后直接访问 `http://127.0.0.1:18080`
+
+推荐本机开发模式的原因：
 
 - 项目代码改动后直接 `go run` 即可，不需要每次重建业务镜像
 - Redis 和观测栈由 Docker 提供，环境更稳定
@@ -162,3 +170,24 @@ dashboard HTTP server listening on http://127.0.0.1:8080
 - 当前业务服务本身仍然是手动 `go run` 启动，不是业务容器化部署
 - 当前 summary 仍然是启发式 provider，不是真实外部摘要模型
 - 当前还没有 `dry_run / explain / cache debug` 对外接口
+
+## 10. Docker Compose 一键部署
+
+如果你的目标不是本机开发，而是“整个应用直接容器化部署并访问”，在仓库根目录执行：
+
+```bash
+docker compose up -d --build
+```
+
+启动成功后可直接访问：
+
+- Dashboard: `http://127.0.0.1:18080`
+- Metrics: `http://127.0.0.1:19091/metrics`
+- Grafana: `http://localhost:13000`
+- Prometheus: `http://localhost:19090`
+
+对应容器配置会自动加载 `config/service.docker.yaml`，并在容器网络中使用：
+
+- Redis: `redis:6379`
+- OTel Collector: `otel-collector:4318`
+- Tempo: `http://tempo:3200`

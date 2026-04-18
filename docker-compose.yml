@@ -1,0 +1,113 @@
+name: context-refiner
+
+services:
+  refiner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GOPROXY: ${GOPROXY:-https://proxy.golang.org,direct}
+    environment:
+      TZ: Asia/Shanghai
+      CONFIG_FILE: /app/config/service.docker.yaml
+    ports:
+      - "15051:15051"
+      - "18080:18080"
+      - "19091:19091"
+    depends_on:
+      redis:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - refiner-net
+
+  redis:
+    image: redis:7.4-alpine
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - refiner-net
+
+  prometheus:
+    image: prom/prometheus:v3.4.2
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "19090:9090"
+    volumes:
+      - ./deploy/observability/prometheus/prometheus.docker.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    restart: unless-stopped
+    networks:
+      - refiner-net
+
+  tempo:
+    image: grafana/tempo:2.8.2
+    command:
+      - "-config.file=/etc/tempo.yaml"
+    ports:
+      - "13200:3200"
+    volumes:
+      - ./deploy/observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/tmp/tempo
+    restart: unless-stopped
+    networks:
+      - refiner-net
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    command:
+      - "--config=/etc/otelcol/config.yaml"
+    ports:
+      - "14318:4318"
+    volumes:
+      - ./deploy/observability/otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+      - tempo
+    restart: unless-stopped
+    networks:
+      - refiner-net
+
+  grafana:
+    image: grafana/grafana:12.0.2
+    ports:
+      - "13000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - tempo
+    restart: unless-stopped
+    networks:
+      - refiner-net
+
+volumes:
+  redis-data:
+  prometheus-data:
+  tempo-data:
+  grafana-data:
+
+networks:
+  refiner-net:
+    driver: bridge

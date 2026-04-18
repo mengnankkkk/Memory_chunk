@@ -1,24 +1,24 @@
 grpc:
-  listen_addr: "127.0.0.1:15051"
+  listen_addr: "0.0.0.0:15051"
 
 web:
   enabled: true
-  listen_addr: "127.0.0.1:18080"
+  listen_addr: "0.0.0.0:18080"
   page_size: 8
 
 observability:
   metrics_enabled: true
-  metrics_listen_addr: ":19091"
+  metrics_listen_addr: "0.0.0.0:19091"
   metrics_path: "/metrics"
   tracing_enabled: true
   service_name: "context-refiner"
-  tracing_endpoint: "localhost:14318"
-  tempo_query_url: "http://localhost:13200"
+  tracing_endpoint: "otel-collector:4318"
+  tempo_query_url: "http://tempo:3200"
   tracing_insecure: true
   tracing_sample_rate: 1.0
 
 redis:
-  addr: "127.0.0.1:16379"
+  addr: "redis:6379"
   username: ""
   password: ""
   db: 0

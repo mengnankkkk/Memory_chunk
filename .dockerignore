@@ -1,0 +1,10 @@
+.git
+.claude
+.idea
+.playwright-mcp
+.spec-workflow
+docs
+tests
+deploy/observability/grafana/data
+tmp
+*.log
