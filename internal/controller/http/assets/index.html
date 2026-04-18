@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Refiner 清洗评估面板</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero">
+      <div class="hero-copy-wrap">
+        <p class="eyebrow">Context Refiner · Observability</p>
+        <h1>上下文清洗评估面板</h1>
+        <p class="hero-copy">通过 TraceQL 定位一次清洗，对比清洗前/后上下文、查看步骤级 token 变化、分页结果与元数据。</p>
+      </div>
+      <div class="hero-side">
+        <div class="live-controls">
+          <label class="live-toggle">
+            <input id="auto-refresh-toggle" type="checkbox" checked>
+            <span class="live-dot"></span>
+            <span class="live-label">自动刷新</span>
+          </label>
+          <select id="auto-refresh-interval" class="live-select">
+            <option value="5000">5s</option>
+            <option value="10000" selected>10s</option>
+            <option value="30000">30s</option>
+            <option value="60000">1m</option>
+          </select>
+          <button id="refresh-btn" class="secondary-btn" type="button" title="立即刷新">↻</button>
+        </div>
+        <p id="generated-at" class="generated-at">等待加载</p>
+      </div>
+    </header>
+
+    <main class="content-grid">
+      <section class="panel panel-wide">
+        <div class="panel-head">
+          <h2>运行概况</h2>
+          <span class="panel-badge">本机</span>
+        </div>
+        <div id="overview-cards" class="stats-grid"></div>
+      </section>
+
+      <section class="panel panel-wide">
+        <div class="panel-head">
+          <h2>KV Cache · 前缀缓存</h2>
+          <span class="panel-badge">Prefix</span>
+        </div>
+        <div id="kvcache-stats" class="stats-grid"></div>
+        <div id="kvcache-detail" class="kvcache-grid"></div>
+      </section>
+
+      <section class="panel panel-wide">
+        <div class="panel-head">
+          <h2>Trace 查询</h2>
+          <span class="panel-badge">Tempo</span>
+        </div>
+        <div class="query-grid">
+          <form id="trace-search-form" class="trace-form">
+            <label class="field-label" for="trace-query-input">TraceQL 查询</label>
+            <textarea id="trace-query-input" name="query" rows="3" placeholder='{ name = "refiner.refine" }'></textarea>
+            <div class="form-actions">
+              <button id="trace-search-btn" class="secondary-btn" type="submit">查询 Trace</button>
+              <span class="metric-meta">默认只看 `refiner.refine` 链路，因为这类 trace 才会携带上下文清洗评估快照。</span>
+            </div>
+          </form>
+
+          <form id="trace-id-form" class="trace-form">
+            <label class="field-label" for="trace-id-input">按 Trace ID 打开评估</label>
+            <input id="trace-id-input" name="traceId" type="text" placeholder="输入完整 trace id">
+            <div class="form-actions">
+              <button id="trace-id-btn" class="secondary-btn" type="submit">打开评估</button>
+              <span id="search-summary" class="metric-meta">尚未发起查询。</span>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <section class="panel panel-wide">
+        <div class="panel-head">
+          <h2>Trace 结果</h2>
+          <span class="panel-badge">列表</span>
+        </div>
+        <div id="trace-results" class="trace-results"></div>
+      </section>
+
+      <section class="panel panel-wide">
+        <div class="panel-head">
+          <h2>清洗指标</h2>
+          <span class="panel-badge">评估</span>
+        </div>
+        <div id="evaluation-status" class="empty-state-card">先选择一条 trace，再查看清洗指标。</div>
+        <div id="evaluation-metrics" class="stats-grid"></div>
+        <div id="evaluation-kvcache" class="kvcache-strip"></div>
+      </section>
+
+      <section class="panel panel-wide">
+        <div class="panel-head">
+          <h2>KV Cache 指标</h2>
+          <span class="panel-badge">Prefix</span>
+        </div>
+        <div id="evaluation-kv-cache" class="stats-grid">
+          <article class="empty-state-card">先选择一条 trace，再查看 KV Cache 命中、稳定前缀与可复用 tokens。</article>
+        </div>
+      </section>
+
+      <section class="panel panel-wide">
+        <div class="panel-head">
+          <h2>上下文前后对比</h2>
+          <span class="panel-badge">双栏</span>
+        </div>
+        <div id="context-compare" class="compare-grid">
+          <article class="context-card empty-state-card">左侧显示清洗前上下文。</article>
+          <article class="context-card empty-state-card">右侧显示清洗后上下文。</article>
+        </div>
+      </section>
+
+      <section class="panel panel-wide">
+        <div class="panel-head">
+          <h2>清洗步骤审计</h2>
+          <span class="panel-badge">Pipeline</span>
+        </div>
+        <div id="step-audits" class="step-list"></div>
+      </section>
+
+      <section class="panel panel-wide">
+        <div class="panel-head">
+          <h2>分页与元数据</h2>
+          <span class="panel-badge">辅助</span>
+        </div>
+        <div id="evaluation-extra" class="extra-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

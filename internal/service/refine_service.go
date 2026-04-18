@@ -21,29 +21,32 @@ import (
 )
 
 type RefinerApplicationService struct {
-	registry      *core.Registry
-	counter       core.TokenCounter
-	pageStore     repository.PageRepository
-	metrics       observability.Recorder
-	policies      map[string]core.RuntimePolicy
-	defaultPolicy string
+	registry       *core.Registry
+	counter        core.TokenCounter
+	pageStore      repository.PageRepository
+	evaluationRepo repository.TraceEvaluationRepository
+	metrics        observability.Recorder
+	policies       map[string]core.RuntimePolicy
+	defaultPolicy  string
 }
 
 func NewRefinerApplicationService(
 	registry *core.Registry,
 	counter core.TokenCounter,
 	pageStore repository.PageRepository,
+	evaluationRepo repository.TraceEvaluationRepository,
 	metrics observability.Recorder,
 	policies map[string]core.RuntimePolicy,
 	defaultPolicy string,
 ) *RefinerApplicationService {
 	return &RefinerApplicationService{
-		registry:      registry,
-		counter:       counter,
-		pageStore:     pageStore,
-		metrics:       metrics,
-		policies:      policies,
-		defaultPolicy: defaultPolicy,
+		registry:       registry,
+		counter:        counter,
+		pageStore:      pageStore,
+		evaluationRepo: evaluationRepo,
+		metrics:        metrics,
+		policies:       policies,
+		defaultPolicy:  defaultPolicy,
 	}
 }
 
@@ -81,6 +84,7 @@ func (s *RefinerApplicationService) RefineDTO(ctx context.Context, req *dto.Refi
 	}
 
 	engineReq := mapper.MapRefineDTOToDomainRequest(req, policy)
+	beforeContext := core.AssemblePrompt(engineReq)
 	if engineReq.Budget <= 0 {
 		err := status.Error(codes.InvalidArgument, "token_budget must be positive or derivable from model.max_context_tokens")
 		span.RecordError(err)
@@ -96,6 +100,12 @@ func (s *RefinerApplicationService) RefineDTO(ctx context.Context, req *dto.Refi
 		span.SetStatus(otelcodes.Error, err.Error())
 		s.metrics.ObserveRefine(policy.Name, "error", "unknown", engineReq.InputTokens, 0, 0, 0, 0, 0, 0, 0, time.Since(start))
 		return nil, status.Errorf(codes.Internal, "run pipeline failed: %v", err)
+	}
+	if resp.Metadata == nil {
+		resp.Metadata = make(map[string]string)
+	}
+	if traceID := strings.TrimSpace(span.SpanContext().TraceID().String()); traceID != "" {
+		resp.Metadata["trace_id"] = traceID
 	}
 	for _, audit := range resp.Audits {
 		s.metrics.ObservePipelineStep(audit.Name, audit.BeforeTokens, audit.AfterTokens, time.Duration(audit.DurationMS)*time.Millisecond)
@@ -123,6 +133,8 @@ func (s *RefinerApplicationService) RefineDTO(ctx context.Context, req *dto.Refi
 		attribute.Bool("refiner.budget_met", resp.BudgetMet),
 		attribute.Int("refiner.input_tokens", resp.InputTokens),
 		attribute.Int("refiner.output_tokens", resp.OutputTokens),
+		attribute.Int("refiner.saved_tokens", maxInt(0, resp.InputTokens-resp.OutputTokens)),
+		attribute.Float64("refiner.compression_ratio", compressionRatio(resp.InputTokens, resp.OutputTokens)),
 		attribute.Int("refiner.stable_prefix_tokens", metadataInt(resp.Metadata, "stable_prefix_tokens")),
 		attribute.String("refiner.prefix_cache_lookup", metadataString(resp.Metadata, "prefix_cache_lookup")),
 		attribute.String("refiner.prefix_cache_miss_reason", metadataString(resp.Metadata, "prefix_cache_miss_reason")),
@@ -131,6 +143,9 @@ func (s *RefinerApplicationService) RefineDTO(ctx context.Context, req *dto.Refi
 		attribute.Int("refiner.pending_summary_jobs", len(resp.PendingSummaryJobIDs)),
 		attribute.Int("refiner.paged_chunks", len(resp.PagedChunks)),
 	)
+	if err := s.saveTraceEvaluation(ctx, span.SpanContext().TraceID().String(), req, engineReq, resp, beforeContext); err != nil {
+		span.AddEvent("trace_evaluation_save_failed")
+	}
 	return mapper.MapRefineDomainResponseToDTO(resp), nil
 }
 
@@ -211,6 +226,121 @@ func metadataString(items map[string]string, key string) string {
 		return ""
 	}
 	return strings.TrimSpace(items[key])
+}
+
+func (s *RefinerApplicationService) saveTraceEvaluation(
+	ctx context.Context,
+	traceID string,
+	req *dto.RefineRequest,
+	engineReq *core.RefineRequest,
+	resp *core.RefineResponse,
+	beforeContext string,
+) error {
+	if s.evaluationRepo == nil {
+		return nil
+	}
+	traceID = strings.TrimSpace(traceID)
+	if traceID == "" || req == nil || engineReq == nil || resp == nil {
+		return nil
+	}
+
+	snapshot := repository.TraceEvaluation{
+		TraceID:          traceID,
+		SessionID:        req.SessionID,
+		RequestID:        req.RequestID,
+		Policy:           engineReq.RuntimePolicy.Name,
+		ModelName:        engineReq.Model.Name,
+		Budget:           engineReq.Budget,
+		BudgetMet:        resp.BudgetMet,
+		MessageCount:     len(req.Messages),
+		RAGChunkCount:    len(req.RAGChunks),
+		InputTokens:      resp.InputTokens,
+		OutputTokens:     resp.OutputTokens,
+		SavedTokens:      maxInt(0, resp.InputTokens-resp.OutputTokens),
+		CompressionRatio: compressionRatio(resp.InputTokens, resp.OutputTokens),
+		BeforeContext:    beforeContext,
+		AfterContext:     resp.OptimizedPrompt,
+		Metadata:         cloneStringMap(resp.Metadata),
+		Steps:            mapEvaluationSteps(resp.Audits),
+		PagedChunks:      mapEvaluationPagedChunks(resp.PagedChunks),
+		CreatedAt:        time.Now().UTC(),
+	}
+	return s.evaluationRepo.SaveTraceEvaluation(ctx, snapshot)
+}
+
+func mapEvaluationSteps(items []core.StepAudit) []repository.TraceEvaluationStep {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]repository.TraceEvaluationStep, 0, len(items))
+	for _, item := range items {
+		out = append(out, repository.TraceEvaluationStep{
+			Name:         item.Name,
+			BeforeTokens: item.BeforeTokens,
+			AfterTokens:  item.AfterTokens,
+			DeltaTokens:  item.AfterTokens - item.BeforeTokens,
+			DurationMS:   item.DurationMS,
+			Details:      cloneStringMap(item.Details),
+			Capabilities: repository.TraceEvaluationCapabilities{
+				Aggressive:          item.Capabilities.Aggressive,
+				Lossy:               item.Capabilities.Lossy,
+				StructuredInputOnly: item.Capabilities.StructuredInputOnly,
+				MinTriggerTokens:    item.Capabilities.MinTriggerTokens,
+				PreserveCitation:    item.Capabilities.PreserveCitation,
+			},
+			Semantic: repository.TraceEvaluationStepSemanticInfo{
+				Removed:             append([]string(nil), item.Semantic.Removed...),
+				Retained:            append([]string(nil), item.Semantic.Retained...),
+				Reasons:             append([]string(nil), item.Semantic.Reasons...),
+				SourcePreserved:     item.Semantic.SourcePreserved,
+				CodeFencePreserved:  item.Semantic.CodeFencePreserved,
+				ErrorStackPreserved: item.Semantic.ErrorStackPreserved,
+				DroppedCitations:    item.Semantic.DroppedCitations,
+			},
+		})
+	}
+	return out
+}
+
+func mapEvaluationPagedChunks(items []core.PagedChunk) []repository.TraceEvaluationPageSet {
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]repository.TraceEvaluationPageSet, 0, len(items))
+	for _, item := range items {
+		out = append(out, repository.TraceEvaluationPageSet{
+			SessionID: item.SessionID,
+			RequestID: item.RequestID,
+			ChunkID:   item.ChunkID,
+			PageKeys:  append([]string(nil), item.PageKeys...),
+		})
+	}
+	return out
+}
+
+func cloneStringMap(items map[string]string) map[string]string {
+	if len(items) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(items))
+	for key, value := range items {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func compressionRatio(before int, after int) float64 {
+	if before <= 0 {
+		return 0
+	}
+	return float64(after) / float64(before)
+}
+
+func maxInt(a int, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func mapSummaryArtifactToDTO(artifact *repository.SummaryArtifact) *dto.SummaryArtifact {

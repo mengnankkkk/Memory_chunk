@@ -13,6 +13,11 @@ type AppConfig struct {
 	GRPC struct {
 		ListenAddr string `yaml:"listen_addr"`
 	} `yaml:"grpc"`
+	Web struct {
+		Enabled    bool   `yaml:"enabled"`
+		ListenAddr string `yaml:"listen_addr"`
+		PageSize   int    `yaml:"page_size"`
+	} `yaml:"web"`
 	Observability struct {
 		MetricsEnabled    bool    `yaml:"metrics_enabled"`
 		MetricsListenAddr string  `yaml:"metrics_listen_addr"`
@@ -20,6 +25,7 @@ type AppConfig struct {
 		TracingEnabled    bool    `yaml:"tracing_enabled"`
 		ServiceName       string  `yaml:"service_name"`
 		TracingEndpoint   string  `yaml:"tracing_endpoint"`
+		TempoQueryURL     string  `yaml:"tempo_query_url"`
 		TracingInsecure   bool    `yaml:"tracing_insecure"`
 		TracingSampleRate float64 `yaml:"tracing_sample_rate"`
 	} `yaml:"observability"`
@@ -96,6 +102,12 @@ func LoadAppConfig(path string) (*AppConfig, error) {
 	if cfg.Pipeline.PagingTokenThreshold <= 0 {
 		cfg.Pipeline.PagingTokenThreshold = 320
 	}
+	if strings.TrimSpace(cfg.Web.ListenAddr) == "" {
+		cfg.Web.ListenAddr = "127.0.0.1:8080"
+	}
+	if cfg.Web.PageSize <= 0 {
+		cfg.Web.PageSize = 8
+	}
 	if cfg.PrefixCache.MinStablePrefixTokens <= 0 {
 		cfg.PrefixCache.MinStablePrefixTokens = 32
 	}
@@ -122,6 +134,9 @@ func LoadAppConfig(path string) (*AppConfig, error) {
 	if strings.TrimSpace(cfg.Observability.ServiceName) == "" {
 		cfg.Observability.ServiceName = "context-refiner"
 	}
+	if strings.TrimSpace(cfg.Observability.TempoQueryURL) == "" {
+		cfg.Observability.TempoQueryURL = "http://localhost:3200"
+	}
 	if cfg.Observability.MetricsEnabled && strings.TrimSpace(cfg.Observability.MetricsListenAddr) == "" {
 		cfg.Observability.MetricsListenAddr = ":9091"
 	}
@@ -147,6 +162,8 @@ func (c *AppConfig) Validate() error {
 	switch {
 	case strings.TrimSpace(c.GRPC.ListenAddr) == "":
 		return fmt.Errorf("grpc.listen_addr is required")
+	case c.Web.Enabled && strings.TrimSpace(c.Web.ListenAddr) == "":
+		return fmt.Errorf("web.listen_addr is required when web.enabled=true")
 	case strings.TrimSpace(c.Redis.Addr) == "":
 		return fmt.Errorf("redis.addr is required")
 	case strings.TrimSpace(c.Pipeline.PolicyFile) == "":

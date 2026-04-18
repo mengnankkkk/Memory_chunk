@@ -1,4 +1,14 @@
 services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: context-refiner-redis
+    ports:
+      - "6379:6379"
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+
   prometheus:
     image: prom/prometheus:v3.4.2
     container_name: context-refiner-prometheus
@@ -17,7 +27,6 @@ services:
       - "-config.file=/etc/tempo.yaml"
     ports:
       - "3200:3200"
-      - "4317:4317"
     volumes:
       - ./tempo.yaml:/etc/tempo.yaml:ro
 
@@ -28,7 +37,6 @@ services:
       - "--config=/etc/otelcol/config.yaml"
     ports:
       - "4318:4318"
-      - "4317:4317"
     volumes:
       - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
     depends_on:

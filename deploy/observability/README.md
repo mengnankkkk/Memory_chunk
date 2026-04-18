@@ -1,11 +1,16 @@
 # Observability Stack
 
-该目录提供一个最小可运行的观测栈，用于接收 `context-refiner` 的 Metrics 与 Traces。
+该目录现在提供一套本机开发用基础设施，用于让 `context-refiner` 在宿主机运行时，统一接入：
+
+- Redis
+- Metrics
+- Traces
 
 ## 组件
 
+- `Redis`：提供 page artifact、summary job、prefix cache 存储
 - `Prometheus`：抓取 `/metrics`
-- `Grafana`：加载预置 datasource 与 dashboard
+- `Grafana`：加载预置 datasource 和 dashboard
 - `Tempo`：存储 tracing 数据
 - `OTel Collector`：接收应用通过 OTLP HTTP 上报的 traces，再转发到 Tempo
 
@@ -18,6 +23,7 @@ docker compose up -d
 
 ## 默认端口
 
+- Redis: `127.0.0.1:6379`
 - Grafana: `http://localhost:3000`
 - Prometheus: `http://localhost:9090`
 - Tempo: `http://localhost:3200`
@@ -28,6 +34,14 @@ docker compose up -d
 应用配置文件可保持如下设置：
 
 ```yaml
+grpc:
+  listen_addr: "127.0.0.1:50051"
+
+web:
+  enabled: true
+  listen_addr: "127.0.0.1:8080"
+  page_size: 8
+
 observability:
   metrics_enabled: true
   metrics_listen_addr: ":9091"
@@ -36,6 +50,33 @@ observability:
   tracing_endpoint: "localhost:4318"
   tracing_insecure: true
   tracing_sample_rate: 1.0
+
+redis:
+  addr: "127.0.0.1:6379"
+  username: ""
+  password: ""
+  db: 0
 ```
 
-Prometheus 默认通过 `host.docker.internal:9091` 抓取宿主机上的应用指标，适配当前 Windows 本地开发方式。
+说明：
+
+- 项目进程运行在宿主机上
+- Redis、Prometheus、Grafana、Tempo、OTel Collector 运行在 Docker 中
+- Prometheus 通过 `host.docker.internal:9091` 抓取宿主机指标
+- 项目通过 `localhost:4318` 把 tracing 发给 Docker 中暴露到宿主机的 OTel Collector
+- Redis 通过 `127.0.0.1:6379` 提供给宿主机项目访问
+
+## 本机推荐启动顺序
+
+1. 在 `deploy/observability` 下执行 `docker compose up -d`
+2. 在仓库根目录执行 `go run ./cmd/refiner`
+3. 打开 `http://127.0.0.1:8080` 查看 Dashboard
+4. 打开 `http://localhost:3000` 查看 Grafana
+
+## 这次统一修正了什么
+
+- 补上了本机运行所需的 `redis` 容器
+- 保持应用 Redis 地址与 Docker 暴露端口一致：`127.0.0.1:6379`
+- 保持 tracing 地址与 Docker 暴露端口一致：`localhost:4318`
+- 保持 metrics 监听方式与 Prometheus 抓取方式一致：应用监听 `:9091`，Prometheus 抓 `host.docker.internal:9091`
+- 移除了 `tempo` 与 `otel-collector` 同时占用宿主机 `4317` 的冲突配置

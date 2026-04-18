@@ -1,5 +1,10 @@
 grpc:
-  listen_addr: ""
+  listen_addr: "127.0.0.1:50051"
+
+web:
+  enabled: true
+  listen_addr: "127.0.0.1:8080"
+  page_size: 8
 
 observability:
   metrics_enabled: true
@@ -8,11 +13,12 @@ observability:
   tracing_enabled: true
   service_name: "context-refiner"
   tracing_endpoint: "localhost:4318"
+  tempo_query_url: "http://localhost:3200"
   tracing_insecure: true
   tracing_sample_rate: 1.0
 
 redis:
-  addr: ""
+  addr: "127.0.0.1:6379"
   username: ""
   password: ""
   db: 0

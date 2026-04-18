@@ -9,7 +9,9 @@ import (
 
 	redisstore "context-refiner/internal/adapter/outbound/redis"
 	"context-refiner/internal/adapter/outbound/summary"
+	tempoquery "context-refiner/internal/adapter/outbound/tempo"
 	grpccontroller "context-refiner/internal/controller/grpc"
+	httpcontroller "context-refiner/internal/controller/http"
 	"context-refiner/internal/domain/core"
 	"context-refiner/internal/domain/core/repository"
 	"context-refiner/internal/infra/config"
@@ -29,6 +31,7 @@ type AppRuntime struct {
 	GRPCServer      *grpc.Server
 	MetricsRecorder observability.Recorder
 	MetricsServer   *http.Server
+	DashboardServer *http.Server
 	TraceShutdown   func(context.Context) error
 }
 
@@ -67,11 +70,41 @@ func LoadRuntime(ctx context.Context, configPath string) (*AppRuntime, error) {
 		registry,
 		counter,
 		redisRepository,
+		redisRepository,
 		metricsRecorder,
 		policies,
 		cfg.Pipeline.DefaultPolicy,
 	)
 	grpccontroller.RegisterRefinerService(grpcServer, refinerService)
+
+	var dashboardServer *http.Server
+	if cfg.Web.Enabled {
+		tempoRepository, err := tempoquery.NewRepository(tempoquery.Config{
+			BaseURL: cfg.Observability.TempoQueryURL,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("init tempo query repository failed: %w", err)
+		}
+		dashboardService := service.NewDashboardService(redisRepository, tempoRepository, redisRepository, service.DashboardServiceConfig{
+			GRPCListenAddr:       cfg.GRPC.ListenAddr,
+			WebListenAddr:        cfg.Web.ListenAddr,
+			MetricsListenAddr:    cfg.Observability.MetricsListenAddr,
+			MetricsPath:          cfg.Observability.MetricsPath,
+			RedisAddr:            cfg.Redis.Addr,
+			TempoQueryURL:        cfg.Observability.TempoQueryURL,
+			DefaultPolicy:        cfg.Pipeline.DefaultPolicy,
+			DefaultTenant:        cfg.PrefixCache.DefaultTenant,
+			TracingEnabled:       cfg.Observability.TracingEnabled,
+			SummaryWorkerEnabled: cfg.SummaryWorker.Enabled,
+			PageSize:             cfg.Web.PageSize,
+			SummaryConsumerGroup: cfg.SummaryWorker.ConsumerGroup,
+		})
+		dashboardController := httpcontroller.NewDashboardController(dashboardService, refinerService)
+		dashboardServer = &http.Server{
+			Addr:    cfg.Web.ListenAddr,
+			Handler: dashboardController.Routes(),
+		}
+	}
 
 	return &AppRuntime{
 		Cfg:             cfg,
@@ -80,6 +113,7 @@ func LoadRuntime(ctx context.Context, configPath string) (*AppRuntime, error) {
 		GRPCServer:      grpcServer,
 		MetricsRecorder: metricsRecorder,
 		MetricsServer:   metricsServer,
+		DashboardServer: dashboardServer,
 		TraceShutdown:   traceShutdown,
 	}, nil
 }
@@ -237,6 +271,24 @@ func StartMetricsServer(ctx context.Context, runtime *AppRuntime) {
 		log.Printf("metrics HTTP server listening on %s%s", runtime.Cfg.Observability.MetricsListenAddr, runtime.Cfg.Observability.MetricsPath)
 		if err := runtime.MetricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Printf("metrics server stopped with error: %v", err)
+		}
+	}()
+}
+
+func StartDashboardServer(ctx context.Context, runtime *AppRuntime) {
+	if runtime.DashboardServer == nil {
+		return
+	}
+	go func() {
+		<-ctx.Done()
+		if err := runtime.DashboardServer.Shutdown(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
+			log.Printf("dashboard server shutdown failed: %v", err)
+		}
+	}()
+	go func() {
+		log.Printf("dashboard HTTP server listening on http://%s", runtime.Cfg.Web.ListenAddr)
+		if err := runtime.DashboardServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("dashboard server stopped with error: %v", err)
 		}
 	}()
 }

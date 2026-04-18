@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"log"
 	"net"
 	"os"
@@ -16,10 +17,13 @@ import (
 )
 
 func main() {
+	configPath := flag.String("config", "config/service.yaml", "path to app config file")
+	flag.Parse()
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	runtime, err := bootstrap.LoadRuntime(ctx, "config/service.yaml")
+	runtime, err := bootstrap.LoadRuntime(ctx, *configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,6 +52,7 @@ func main() {
 
 	bootstrap.StartSummaryWorker(ctx, runtime)
 	bootstrap.StartMetricsServer(ctx, runtime)
+	bootstrap.StartDashboardServer(ctx, runtime)
 
 	log.Printf("refiner gRPC server listening on %s", runtime.Cfg.GRPC.ListenAddr)
 	if err := runtime.GRPCServer.Serve(lis); err != nil && !errors.Is(err, grpc.ErrServerStopped) {

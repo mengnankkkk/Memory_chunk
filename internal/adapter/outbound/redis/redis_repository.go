@@ -420,6 +420,10 @@ func (r *RedisRepository) summaryKey(key string) string {
 	return r.keyPrefix + ":summary:" + key
 }
 
+func (r *RedisRepository) traceEvaluationKey(traceID string) string {
+	return r.keyPrefix + ":trace-eval:" + strings.TrimSpace(traceID)
+}
+
 func (r *RedisRepository) prefixKey(parts ...string) string {
 	filtered := make([]string, 0, len(parts)+1)
 	filtered = append(filtered, r.keyPrefix, "prefix")
