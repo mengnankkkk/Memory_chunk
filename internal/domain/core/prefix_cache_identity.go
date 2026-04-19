@@ -5,29 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
-)
-
-var (
-	whitespacePattern = regexp.MustCompile(`\s+`)
-	uuidPattern       = regexp.MustCompile(`(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b`)
-	hexIDPattern      = regexp.MustCompile(`(?i)\b[0-9a-f]{16,}\b`)
-	isoTimePattern    = regexp.MustCompile(`\b\d{4}-\d{2}-\d{2}([tT ]\d{2}:\d{2}:\d{2}(\.\d+)?([zZ]|[+-]\d{2}:\d{2})?)?\b`)
-	volatileJSONKeys  = map[string]struct{}{
-		"request_id":    {},
-		"requestid":     {},
-		"session_id":    {},
-		"sessionid":     {},
-		"trace_id":      {},
-		"traceid":       {},
-		"span_id":       {},
-		"spanid":        {},
-		"timestamp":     {},
-		"created_at":    {},
-		"updated_at":    {},
-		"correlationid": {},
-	}
 )
 
 type PrefixCacheIdentity struct {
@@ -244,29 +222,6 @@ func NormalizeFragmentContent(fragment RAGFragment) string {
 	}
 }
 
-func NormalizeTextContent(value string, segment string) string {
-	trimmed := strings.TrimSpace(strings.ReplaceAll(value, "\r\n", "\n"))
-	if trimmed == "" {
-		return ""
-	}
-	if segment != "active_turn" {
-		trimmed = isoTimePattern.ReplaceAllString(trimmed, "<timestamp>")
-		trimmed = uuidPattern.ReplaceAllString(trimmed, "<uuid>")
-		trimmed = hexIDPattern.ReplaceAllStringFunc(trimmed, func(value string) string {
-			if strings.HasPrefix(strings.ToLower(value), "0x") {
-				return value
-			}
-			return "<hex-id>"
-		})
-		trimmed = normalizeKeyLikeValue(trimmed, "request_id", "<request-id>")
-		trimmed = normalizeKeyLikeValue(trimmed, "requestId", "<request-id>")
-		trimmed = normalizeKeyLikeValue(trimmed, "session_id", "<session-id>")
-		trimmed = normalizeKeyLikeValue(trimmed, "trace_id", "<trace-id>")
-		trimmed = normalizeKeyLikeValue(trimmed, "traceId", "<trace-id>")
-	}
-	return normalizeWhitespace(trimmed)
-}
-
 func hashStrings(parts ...string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(parts, "\n"))))
 }
@@ -335,14 +290,6 @@ func normalizeRole(value string) string {
 		return "user"
 	}
 	return role
-}
-
-func normalizeWhitespace(value string) string {
-	lines := strings.Split(value, "\n")
-	for i, line := range lines {
-		lines[i] = whitespacePattern.ReplaceAllString(strings.TrimSpace(line), " ")
-	}
-	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 func normalizeCodeContent(value string) string {
@@ -416,11 +363,6 @@ func normalizePageRefs(values []string) []string {
 		}
 	}
 	return out
-}
-
-func normalizeKeyLikeValue(input string, key string, replacement string) string {
-	replacer := regexp.MustCompile(`(?i)(` + regexp.QuoteMeta(key) + `\s*[:=]\s*)([^\s,;]+)`)
-	return replacer.ReplaceAllString(input, `${1}`+replacement)
 }
 
 func firstNonBlank(values ...string) string {
