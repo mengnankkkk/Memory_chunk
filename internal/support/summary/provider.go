@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"context-refiner/internal/domain/core/components"
 	"context-refiner/internal/domain/core/repository"
 )
 
@@ -31,7 +32,8 @@ func (p *HeuristicProvider) Version() string {
 }
 
 func (p *HeuristicProvider) Summarize(_ context.Context, job repository.SummaryJob) (repository.SummaryArtifact, error) {
-	summaryText := strings.TrimSpace(summarizeJob(job))
+	component := components.NewSummaryComponent()
+	summaryText := strings.TrimSpace(component.SummarizeJob(toSummaryComponentJob(job)))
 	if summaryText == "" {
 		return repository.SummaryArtifact{}, fmt.Errorf("empty summary text")
 	}
@@ -53,6 +55,22 @@ func (p *HeuristicProvider) Summarize(_ context.Context, job repository.SummaryJ
 		SchemaVersion:   repository.SummaryArtifactSchemaVersionV1,
 		CreatedAt:       createdAt,
 	}, nil
+}
+
+func toSummaryComponentJob(job repository.SummaryJob) components.SummaryJob {
+	fragments := make([]components.SummaryFragment, 0, len(job.Fragments))
+	for _, fragment := range job.Fragments {
+		fragments = append(fragments, components.SummaryFragment{
+			Type:     fragment.Type,
+			Content:  fragment.Content,
+			Language: fragment.Language,
+		})
+	}
+	return components.SummaryJob{
+		Source:    job.Source,
+		Content:   job.Content,
+		Fragments: fragments,
+	}
 }
 
 func summaryFragmentTypes(fragments []repository.SummaryFragment) []string {

@@ -7,7 +7,6 @@ import (
 
 	"context-refiner/internal/domain/core"
 	"context-refiner/internal/domain/core/components"
-	"context-refiner/internal/support/heuristic"
 )
 
 type JSONTrimProcessor struct {
@@ -177,17 +176,17 @@ func (p *SnipProcessor) Process(_ context.Context, req *core.RefineRequest) (*co
 }
 
 func trimJSON(content string) string {
-	data, err := heuristic.ParseJSON(content)
+	data, err := components.ParseJSON(content)
 	if err != nil {
 		return content
 	}
-	if compacted, ok := heuristic.CompactJSON(content); ok {
+	if compacted, ok := components.CompactJSON(content); ok {
 		content = compacted
 	}
 	if len(content) < 320 {
 		return content
 	}
-	summary := heuristic.DescribeJSONValue(data, 12)
+	summary := components.DescribeJSONValue(data, 12)
 	if strings.HasPrefix(summary, "JSON Scalar: ") {
 		return content
 	}
@@ -207,7 +206,7 @@ func reduceTable(content string) string {
 }
 
 func outlineCode(content string) string {
-	outline := heuristic.CodeOutlineLines(content, 12)
+	outline := components.CodeOutlineLines(content, 12)
 	if len(outline) == 0 {
 		return content
 	}
@@ -215,7 +214,7 @@ func outlineCode(content string) string {
 }
 
 func focusErrorStack(content string) string {
-	selected := heuristic.ErrorStackFocusLines(content, 10)
+	selected := components.ErrorStackFocusLines(content, 10)
 	if len(selected) == 0 {
 		return content
 	}

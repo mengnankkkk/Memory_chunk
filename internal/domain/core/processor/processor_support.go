@@ -141,9 +141,19 @@ func splitRunesByTokenBudget(counter core.TokenCounter, text string, maxTokens i
 	return parts
 }
 
-func splitFragmentByTokenBudget(counter core.TokenCounter, fragment core.RAGFragment, maxTokens int) []core.RAGFragment {
+func splitFragmentByTokenBudget(counter core.TokenCounter, rag *components.RAGNormalizer, fragment core.RAGFragment, maxTokens int) []core.RAGFragment {
 	if maxTokens <= 0 || counter.CountFragment(fragment) <= maxTokens {
 		return []core.RAGFragment{fragment}
+	}
+	if rag != nil {
+		parts := rag.SplitFragmentByTokenBudget(components.RAGFragment{
+			Type:     string(fragment.Type),
+			Content:  fragment.Content,
+			Language: fragment.Language,
+		}, maxTokens, counter.CountText)
+		if len(parts) > 0 {
+			return fromComponentFragments(parts)
+		}
 	}
 	parts := splitTextByTokenBudget(counter, fragment.Content, maxTokens)
 	fragments := make([]core.RAGFragment, 0, len(parts))

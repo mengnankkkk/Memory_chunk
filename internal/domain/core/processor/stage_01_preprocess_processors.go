@@ -14,6 +14,7 @@ type PagingProcessor struct {
 	counter   core.TokenCounter
 	store     repository.PageRepository
 	pageLimit int
+	rag       *components.RAGNormalizer
 }
 
 type CollapseProcessor struct {
@@ -41,6 +42,7 @@ func NewPagingProcessor(counter core.TokenCounter, pageStore repository.PageRepo
 		counter:   counter,
 		store:     pageStore,
 		pageLimit: pageLimit,
+		rag:       components.NewRAGNormalizer(),
 	}
 }
 
@@ -133,7 +135,7 @@ func (p *PagingProcessor) Process(ctx context.Context, req *core.RefineRequest) 
 		if p.counter.CountChunk(chunk) <= p.pageLimit {
 			continue
 		}
-		pages := paginateChunk(p.counter, chunk, p.pageLimit)
+		pages := paginateChunk(p.counter, p.rag, chunk, p.pageLimit)
 		pageRefs := make([]string, 0, len(pages))
 		canonicalChunk := core.ChunkText(core.StableRAGChunks([]core.RAGChunk{chunk})[0])
 		chunkHash := hashText(canonicalChunk)
@@ -306,6 +308,26 @@ func (p *SanitizeProcessor) Process(_ context.Context, req *core.RefineRequest) 
 func (p *CanonicalizeProcessor) Process(_ context.Context, req *core.RefineRequest) (*core.RefineRequest, core.ProcessResult, error) {
 	updated := cloneRequest(req)
 	before := len(updated.RAGChunks)
+	preprocessedChunks := 0
+	changedFragments := 0
+	promotedTitles := 0
+	removedBoilerplate := 0
+	createdSections := 0
+	ruleHits := map[string]struct{}{}
+
+	for i, chunk := range updated.RAGChunks {
+		result := p.ragNormalizer.PreprocessChunk(toComponentChunk(chunk))
+		updated.RAGChunks[i] = fromComponentChunk(result.Chunk)
+		preprocessedChunks += result.Report.ProcessedChunks
+		changedFragments += result.Report.ChangedFragments
+		promotedTitles += result.Report.PromotedTitles
+		removedBoilerplate += result.Report.RemovedBoilerplateLines
+		createdSections += result.Report.CreatedSectionFragments
+		for _, rule := range result.Report.AppliedRules {
+			ruleHits[rule] = struct{}{}
+		}
+	}
+
 	systemMessages, memoryMessages, activeMessages := p.promptComponent.StablePromptSegments(toPromptMessages(updated.Messages))
 	updated.Messages = append(append(fromPromptMessages(systemMessages), fromPromptMessages(memoryMessages)...), fromPromptMessages(activeMessages)...)
 	updated.RAGChunks = fromComponentChunks(p.ragNormalizer.StableChunks(toComponentChunks(updated.RAGChunks)))
@@ -321,14 +343,20 @@ func (p *CanonicalizeProcessor) Process(_ context.Context, req *core.RefineReque
 	updated.CurrentTokens = p.counter.CountRequest(updated)
 	return updated, core.ProcessResult{
 		Details: map[string]string{
-			"canonicalized_chunks":   fmt.Sprintf("%d", before),
-			"stable_system_messages": fmt.Sprintf("%d", len(systemMessages)),
-			"stable_memory_messages": fmt.Sprintf("%d", len(memoryMessages)),
-			"active_messages":        fmt.Sprintf("%d", len(activeMessages)),
+			"canonicalized_chunks":      fmt.Sprintf("%d", before),
+			"preprocessed_chunks":       fmt.Sprintf("%d", preprocessedChunks),
+			"changed_fragments":         fmt.Sprintf("%d", changedFragments),
+			"promoted_titles":           fmt.Sprintf("%d", promotedTitles),
+			"removed_boilerplate":       fmt.Sprintf("%d", removedBoilerplate),
+			"created_section_fragments": fmt.Sprintf("%d", createdSections),
+			"rule_hits":                 strings.Join(sortedRuleHits(ruleHits), ","),
+			"stable_system_messages":    fmt.Sprintf("%d", len(systemMessages)),
+			"stable_memory_messages":    fmt.Sprintf("%d", len(memoryMessages)),
+			"active_messages":           fmt.Sprintf("%d", len(activeMessages)),
 		},
 		Semantic: core.StepSemanticAudit{
 			Retained:            appendNonEmpty(nil, "rag_ordering", "sources", "fragments", "message_roles", "message_content"),
-			Reasons:             appendNonEmpty(nil, "stabilize_prompt_prefix_for_cache_hits", "normalize_high_churn_fields"),
+			Reasons:             appendNonEmpty(nil, "stabilize_prompt_prefix_for_cache_hits", "normalize_high_churn_fields", "preserve_heading_boundaries", "remove_document_boilerplate"),
 			SourcePreserved:     true,
 			CodeFencePreserved:  true,
 			ErrorStackPreserved: true,
@@ -336,13 +364,13 @@ func (p *CanonicalizeProcessor) Process(_ context.Context, req *core.RefineReque
 	}, nil
 }
 
-func paginateChunk(counter core.TokenCounter, chunk core.RAGChunk, pageLimit int) [][]core.RAGFragment {
+func paginateChunk(counter core.TokenCounter, rag *components.RAGNormalizer, chunk core.RAGChunk, pageLimit int) [][]core.RAGFragment {
 	pages := make([][]core.RAGFragment, 0)
 	current := make([]core.RAGFragment, 0)
 	currentTokens := 0
 
 	for _, fragment := range chunk.Fragments {
-		splitParts := splitFragmentByTokenBudget(counter, fragment, pageLimit)
+		splitParts := splitFragmentByTokenBudget(counter, rag, fragment, pageLimit)
 		for _, part := range splitParts {
 			partTokens := counter.CountFragment(part)
 			if currentTokens > 0 && currentTokens+partTokens > pageLimit {
