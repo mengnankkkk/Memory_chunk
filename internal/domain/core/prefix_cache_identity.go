@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
+
+	"context-refiner/internal/domain/core/components"
 )
 
 type PrefixCacheIdentity struct {
@@ -59,55 +61,21 @@ func AssembleStablePrefix(req *RefineRequest) string {
 }
 
 func BuildPrefixCacheIdentity(req *RefineRequest, counter TokenCounter) PrefixCacheIdentity {
-	modelID := "unknown"
-	if req != nil && strings.TrimSpace(req.Model.Name) != "" {
-		modelID = strings.TrimSpace(req.Model.Name)
-	}
-
-	systemMessages, memoryMessages, _ := StablePromptSegments(nilSafeMessages(req))
-	stableChunks := StableRAGChunks(nilSafeChunks(req))
-
-	systemPrompt := buildMessageSection("# Stable System", systemMessages)
-	memoryPrompt := buildMessageSection("# Conversation Memory", memoryMessages)
-	ragPrompt := buildRAGSection("# Stable Context", stableChunks)
-	conversationPrompt := buildMessageSection("# Conversation Memory", append(append([]Message(nil), systemMessages...), memoryMessages...))
-	stablePrompt := joinSectionLines(ragPrompt, conversationPrompt)
-
-	identity := PrefixCacheIdentity{
-		ModelID:              modelID,
-		StablePrefixPrompt:   stablePrompt,
-		SystemPrefixPrompt:   systemPrompt,
-		MemoryPrefixPrompt:   memoryPrompt,
-		RAGPrefixPrompt:      ragPrompt,
-		NormalizationVersion: "stable-prefix-v2",
-	}
-	if stablePrompt != "" {
-		identity.CombinedPrefixHash = hashStrings(modelID, stablePrompt)
-	}
-	if systemPrompt != "" {
-		identity.SystemPrefixHash = hashStrings(modelID, systemPrompt)
-	}
-	if memoryPrompt != "" {
-		identity.MemoryPrefixHash = hashStrings(modelID, memoryPrompt)
-	}
-	if ragPrompt != "" {
-		identity.RAGPrefixHash = hashStrings(modelID, ragPrompt)
-	}
-	if counter != nil {
-		identity.StablePrefixTokens = countIfPresent(counter, stablePrompt)
-		identity.SystemPrefixTokens = countIfPresent(counter, systemPrompt)
-		identity.MemoryPrefixTokens = countIfPresent(counter, memoryPrompt)
-		identity.RAGPrefixTokens = countIfPresent(counter, ragPrompt)
-	}
-	return identity
+	modelID := normalizedModelID(req)
+	sections := defaultPromptComponent.BuildStablePrefixSectionsFromMessages(
+		toPromptMessages(nilSafeMessages(req)),
+		toComponentChunks(nilSafeChunks(req)),
+	)
+	return buildPrefixCacheIdentity(modelID, sections, counter)
 }
 
 func BuildPrefixCacheIdentityFromSegments(modelID string, systemPrompt string, memoryPrompt string, ragPrompt string, counter TokenCounter) PrefixCacheIdentity {
-	modelID = strings.TrimSpace(modelID)
-	if modelID == "" {
-		modelID = "unknown"
-	}
+	modelID = firstNonBlank(modelID, "unknown")
 	sections := defaultPromptComponent.BuildStablePrefixSections(systemPrompt, memoryPrompt, ragPrompt)
+	return buildPrefixCacheIdentity(modelID, sections, counter)
+}
+
+func buildPrefixCacheIdentity(modelID string, sections components.StablePrefixSections, counter TokenCounter) PrefixCacheIdentity {
 	identity := PrefixCacheIdentity{
 		ModelID:              modelID,
 		StablePrefixPrompt:   sections.StablePrompt,
@@ -135,6 +103,13 @@ func BuildPrefixCacheIdentityFromSegments(modelID string, systemPrompt string, m
 		identity.RAGPrefixTokens = countIfPresent(counter, sections.RAGPrompt)
 	}
 	return identity
+}
+
+func normalizedModelID(req *RefineRequest) string {
+	if req == nil {
+		return "unknown"
+	}
+	return firstNonBlank(req.Model.Name, "unknown")
 }
 
 func BuildPrefixNamespace(policy string, tenant string, modelID string, cfg PrefixNamespaceConfig) string {

@@ -1,7 +1,7 @@
 # Context Refiner KV Cache 设计与实现
 
-- 文档版本：`v2026.04.14`
-- 更新日期：`2026-04-14`
+- 文档版本：`v2026.04.19`
+- 更新日期：`2026-04-19`
 - 文档类型：`Design / Implementation Analysis`
 - 适用代码基线：`main`
 
@@ -122,7 +122,7 @@
 
 核心实现：
 
-- [prefix_cache_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/prefix_cache_processor.go)
+- [stage_04_finalize_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_04_finalize_processors.go)
 
 ## 6. Admission Policy
 
@@ -161,7 +161,7 @@ Prefix key 不是全局混用，而是可以按三类维度拼 namespace：
 对应实现：
 
 - [prefix_cache_identity.go](/E:/github/Memory_chunk/internal/domain/core/prefix_cache_identity.go)
-- [prefix_cache_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/prefix_cache_processor.go)
+- [stage_04_finalize_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_04_finalize_processors.go)
 
 目的很直接：
 
@@ -200,7 +200,7 @@ Prefix key 不是全局混用，而是可以按三类维度拼 namespace：
 
 Redis 实现位于：
 
-- [redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
+- [redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go)
 
 ## 9. Key 设计
 
@@ -288,7 +288,7 @@ Redis 实现位于：
 
 这部分逻辑在：
 
-- [redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
+- [redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go)
 
 ## 12. Prewarm 机制
 

@@ -2,30 +2,30 @@ package bootstrap
 
 import (
 	"context"
+	config2 "context-refiner/internal/config"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 
-	redisstore "context-refiner/internal/adapter/outbound/redis"
-	"context-refiner/internal/adapter/outbound/summary"
-	tempoquery "context-refiner/internal/adapter/outbound/tempo"
 	grpccontroller "context-refiner/internal/controller/grpc"
 	httpcontroller "context-refiner/internal/controller/http"
 	"context-refiner/internal/domain/core"
 	"context-refiner/internal/domain/core/repository"
-	"context-refiner/internal/infra/config"
 	"context-refiner/internal/observability"
 	metricsobs "context-refiner/internal/observability/metrics"
 	apptracing "context-refiner/internal/observability/tracing"
 	"context-refiner/internal/service"
+	redisstore "context-refiner/internal/support/redis"
+	"context-refiner/internal/support/summary"
+	tempoquery "context-refiner/internal/support/tempo"
 	"context-refiner/internal/support/tokenizer"
 
 	"google.golang.org/grpc"
 )
 
 type AppRuntime struct {
-	Cfg             *config.AppConfig
+	Cfg             *config2.AppConfig
 	PageRepository  repository.PageRepository
 	RedisRepository *redisstore.RedisRepository
 	GRPCServer      *grpc.Server
@@ -40,7 +40,7 @@ func LoadRuntime(ctx context.Context, configPath string) (*AppRuntime, error) {
 	if err != nil {
 		return nil, err
 	}
-	policies, err := config.LoadPolicies(cfg.Pipeline.PolicyFile)
+	policies, err := config2.LoadPolicies(cfg.Pipeline.PolicyFile)
 	if err != nil {
 		return nil, err
 	}
@@ -118,8 +118,8 @@ func LoadRuntime(ctx context.Context, configPath string) (*AppRuntime, error) {
 	}, nil
 }
 
-func loadConfig(path string) (*config.AppConfig, error) {
-	cfg, err := config.LoadAppConfig(path)
+func loadConfig(path string) (*config2.AppConfig, error) {
+	cfg, err := config2.LoadAppConfig(path)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func loadConfig(path string) (*config.AppConfig, error) {
 	return cfg, nil
 }
 
-func newPageRepository(ctx context.Context, cfg *config.AppConfig, metricsRecorder observability.Recorder) (*redisstore.RedisRepository, error) {
+func newPageRepository(ctx context.Context, cfg *config2.AppConfig, metricsRecorder observability.Recorder) (*redisstore.RedisRepository, error) {
 	pageStore, err := redisstore.NewRedisRepository(ctx, redisstore.Config{
 		Addr:           cfg.Redis.Addr,
 		Username:       cfg.Redis.Username,
@@ -148,7 +148,7 @@ func newPageRepository(ctx context.Context, cfg *config.AppConfig, metricsRecord
 	return pageStore, nil
 }
 
-func newMetricsRuntime(cfg *config.AppConfig) (observability.Recorder, *http.Server, error) {
+func newMetricsRuntime(cfg *config2.AppConfig) (observability.Recorder, *http.Server, error) {
 	if !cfg.Observability.MetricsEnabled {
 		return observability.NewNopRecorder(), nil, nil
 	}
@@ -165,7 +165,7 @@ func newMetricsRuntime(cfg *config.AppConfig) (observability.Recorder, *http.Ser
 	return recorder, server, nil
 }
 
-func newTracingRuntime(ctx context.Context, cfg *config.AppConfig) (func(context.Context) error, error) {
+func newTracingRuntime(ctx context.Context, cfg *config2.AppConfig) (func(context.Context) error, error) {
 	shutdown, err := apptracing.NewProvider(ctx, apptracing.Config{
 		Enabled:     cfg.Observability.TracingEnabled,
 		ServiceName: cfg.Observability.ServiceName,
@@ -179,7 +179,7 @@ func newTracingRuntime(ctx context.Context, cfg *config.AppConfig) (func(context
 	return shutdown, nil
 }
 
-func buildPrefixCachePolicy(cfg *config.AppConfig) core.PrefixCachePolicy {
+func buildPrefixCachePolicy(cfg *config2.AppConfig) core.PrefixCachePolicy {
 	return core.PrefixCachePolicy{
 		MinStablePrefixTokens: cfg.PrefixCache.MinStablePrefixTokens,
 		MinSegmentCount:       cfg.PrefixCache.MinSegmentCount,
@@ -192,7 +192,7 @@ func buildPrefixCachePolicy(cfg *config.AppConfig) core.PrefixCachePolicy {
 	}
 }
 
-func prewarmPrefixCache(ctx context.Context, cfg *config.AppConfig, counter core.TokenCounter, store *redisstore.RedisRepository) error {
+func prewarmPrefixCache(ctx context.Context, cfg *config2.AppConfig, counter core.TokenCounter, store *redisstore.RedisRepository) error {
 	for _, item := range cfg.PrefixCache.Prewarm {
 		identity := core.BuildPrefixCacheIdentityFromSegments(item.ModelID, item.SystemPrompt, item.MemoryPrompt, item.RAGPrompt, counter)
 		if identity.CombinedPrefixHash == "" {

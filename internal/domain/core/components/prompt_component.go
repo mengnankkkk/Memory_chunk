@@ -98,6 +98,20 @@ func (p *PromptComponent) AssemblePrompt(messages []PromptMessage, chunks []RAGC
 }
 
 func (p *PromptComponent) BuildStablePrefixSections(systemPrompt string, memoryPrompt string, ragPrompt string) StablePrefixSections {
+	return p.buildStablePrefixSections(systemPrompt, memoryPrompt, ragPrompt)
+}
+
+func (p *PromptComponent) BuildStablePrefixSectionsFromMessages(messages []PromptMessage, chunks []RAGChunk) StablePrefixSections {
+	systemMessages, memoryMessages, _ := p.StablePromptSegments(messages)
+	stableChunks := p.ragNormalizer.StableChunks(chunks)
+	return p.buildStablePrefixSections(
+		p.renderMessages(systemMessages),
+		p.renderMessages(memoryMessages),
+		p.renderChunks(stableChunks),
+	)
+}
+
+func (p *PromptComponent) buildStablePrefixSections(systemPrompt string, memoryPrompt string, ragPrompt string) StablePrefixSections {
 	systemPrompt = strings.TrimSpace(p.textSanitizer.Sanitize(systemPrompt, TextSanitizerProfileStableText).Text)
 	memoryPrompt = strings.TrimSpace(p.textSanitizer.Sanitize(memoryPrompt, TextSanitizerProfileStableText).Text)
 	ragPrompt = strings.TrimSpace(p.textSanitizer.Sanitize(ragPrompt, TextSanitizerProfileStableText).Text)
@@ -120,6 +134,22 @@ func (p *PromptComponent) BuildStablePrefixSections(systemPrompt string, memoryP
 		RAGPrompt:    ragPrompt,
 		StablePrompt: stablePrompt,
 	}
+}
+
+func (p *PromptComponent) renderChunks(chunks []RAGChunk) string {
+	lines := make([]string, 0, len(chunks))
+	for _, chunk := range chunks {
+		lines = append(lines, p.RenderChunk(chunk))
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func (p *PromptComponent) renderMessages(messages []PromptMessage) string {
+	lines := make([]string, 0, len(messages))
+	for _, message := range messages {
+		lines = append(lines, p.RenderMessage(message))
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 func (p *PromptComponent) RenderChunk(chunk RAGChunk) string {

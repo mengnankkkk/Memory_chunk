@@ -1,7 +1,7 @@
 # Context Refiner 原理剖析文档
 
-- 文档版本：`v2026.04.11`
-- 更新日期：`2026-04-11`
+- 文档版本：`v2026.04.19`
+- 更新日期：`2026-04-19`
 - 文档类型：`Explanation`
 - 适用代码基线：`main` 分支当前实现
 
@@ -101,6 +101,23 @@
 - token 已经够小，就跳过 aggressive 步骤
 - 没有结构化 chunk，就跳过 structured-only 步骤
 - token 没到门槛，就跳过低收益步骤
+
+### 3.3 为什么现在还要把实现继续下沉到 `core/components`
+
+如果 processor 既负责“步骤编排”，又负责“具体文本 / RAG / prompt 规则实现”，目录虽然看起来分层了，但复杂度还是会重新堆回 processor。
+
+所以当前代码又往前走了一步：
+
+- processor 只保留步骤级编排和上下文胶水
+- `TextSanitizer` 统一承接文本清洗顺序、规则和清洗报告
+- `RAGNormalizer` 统一承接 RAG 排序、去抖和稳定化
+- `PromptComponent` 统一承接 prompt section 组装与 stable prefix section 生成
+
+这样做的价值不是“多一层抽象”，而是把高复用、高变化率的规则集中到一个可管理位置，避免：
+
+- 同一条清洗规则散落在 `collapse / compact / canonicalize`
+- prefix section 拼装逻辑残留在 `core` façade
+- 新规则加入后只能在多个 processor 里重复修改
 
 ## 4. 为什么 `paging` 必须先存在
 
@@ -285,10 +302,10 @@ prefix cache 的前提是“前缀逐 token 完全一致”。
 
 ### 已知边界
 
-- 没有自动化测试
-- 没有 Prometheus / Tracing
-- 没有离线评测工具
-- 默认配置为空
+- 已有少量自动化测试，但还没形成覆盖 `service / store / worker` 主链的闭环
+- 已有 Prometheus / Tracing / Grafana / Tempo 基线，但还没有 explain / replay / alerting 闭环
+- 还没有离线 replay 评测工具
+- 默认配置仍需要按环境填充，不能直接作为生产配置使用
 
 ### 残余不确定性
 
@@ -296,7 +313,8 @@ prefix cache 的前提是“前缀逐 token 完全一致”。
 
 - 压缩率是否稳定达到目标 KPI
 - 启发式摘要是否在真实业务数据上足够稳
-- 各个 Processor 的组合是否已达到最佳顺序
+- `TextSanitizer / RAGNormalizer / PromptComponent` 这轮组件化之后，处理顺序是否已经达到最佳收益
+- 应用层 prefix cache 预测与下游真实 KV 命中之间的相关性是否稳定
 
 这不是代码方向错误，而是“证据链还不够完整”。
 

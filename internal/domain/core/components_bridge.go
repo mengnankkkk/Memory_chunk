@@ -1,28 +1,6 @@
 package core
 
-import (
-	"strings"
-
-	"context-refiner/internal/domain/core/components"
-)
-
-var (
-	defaultTextSanitizer   = components.NewTextSanitizer()
-	defaultRAGNormalizer   = components.NewRAGNormalizer()
-	defaultPromptComponent = components.NewPromptComponent()
-)
-
-func NormalizeTextContent(value string, segment string) string {
-	profile := components.TextSanitizerProfileStableText
-	if segment == "active_turn" {
-		profile = components.TextSanitizerProfileActiveTurn
-	}
-	return defaultTextSanitizer.Sanitize(value, profile).Text
-}
-
-func normalizeWhitespace(value string) string {
-	return components.NormalizeWhitespace(value)
-}
+import "context-refiner/internal/domain/core/components"
 
 func toComponentChunk(chunk RAGChunk) components.RAGChunk {
 	return components.RAGChunk{
@@ -108,40 +86,4 @@ func fromPromptMessages(messages []components.PromptMessage) []Message {
 		})
 	}
 	return out
-}
-
-func buildRAGSection(title string, chunks []RAGChunk) string {
-	if len(chunks) == 0 {
-		return ""
-	}
-	lines := []string{title, "## RAG"}
-	for _, chunk := range chunks {
-		lines = append(lines, defaultPromptComponent.RenderChunk(toComponentChunk(chunk)))
-	}
-	return NormalizeTextContent(joinSectionLines(lines...), "rag")
-}
-
-func buildMessageSection(title string, messages []Message) string {
-	if len(messages) == 0 {
-		return ""
-	}
-	lines := []string{title}
-	for _, message := range messages {
-		lines = append(lines, defaultPromptComponent.RenderMessage(components.PromptMessage{
-			Role:    message.Role,
-			Content: message.Content,
-		}))
-	}
-	return NormalizeTextContent(joinSectionLines(lines...), "memory")
-}
-
-func joinSectionLines(parts ...string) string {
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if strings.TrimSpace(part) == "" {
-			continue
-		}
-		out = append(out, strings.TrimSpace(part))
-	}
-	return strings.Join(out, "\n")
 }

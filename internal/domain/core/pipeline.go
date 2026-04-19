@@ -3,11 +3,9 @@ package core
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
-	"context-refiner/internal/domain/core/components"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	otelcodes "go.opentelemetry.io/otel/codes"
@@ -309,20 +307,7 @@ func AssemblePrompt(req *RefineRequest) string {
 }
 
 func StableRAGChunks(chunks []RAGChunk) []RAGChunk {
-	stable := make([]RAGChunk, 0, len(chunks))
-	normalizer := defaultRAGNormalizer
-	for _, chunk := range chunks {
-		stable = append(stable, fromComponentChunk(normalizer.NormalizeChunk(toComponentChunk(chunk)).Chunk))
-	}
-	sort.SliceStable(stable, func(i, j int) bool {
-		left := stableChunkSortKey(stable[i])
-		right := stableChunkSortKey(stable[j])
-		if left == right {
-			return stableChunkTieKey(stable[i]) < stableChunkTieKey(stable[j])
-		}
-		return left < right
-	})
-	return stable
+	return fromComponentChunks(defaultRAGNormalizer.StableChunks(toComponentChunks(chunks)))
 }
 
 func StablePromptMessages(messages []Message) ([]Message, []Message) {
@@ -337,30 +322,6 @@ func StablePromptSegments(messages []Message) ([]Message, []Message, []Message) 
 
 func StableSources(values []string, fallback string) []string {
 	return defaultRAGNormalizer.StableSources(values, fallback)
-}
-
-func renderChunk(chunk RAGChunk) string {
-	return defaultPromptComponent.RenderChunk(toComponentChunk(chunk))
-}
-
-func renderMessage(msg Message) string {
-	return defaultPromptComponent.RenderMessage(components.PromptMessage{Role: msg.Role, Content: msg.Content})
-}
-
-func stableChunkSortKey(chunk RAGChunk) string {
-	sourceLabel := strings.Join(chunk.Sources, ",")
-	if sourceLabel == "" {
-		sourceLabel = strings.TrimSpace(chunk.Source)
-	}
-	return strings.ToLower(sourceLabel)
-}
-
-func stableChunkTieKey(chunk RAGChunk) string {
-	id := strings.TrimSpace(chunk.ID)
-	if id == "" {
-		id = ChunkText(chunk)
-	}
-	return strings.ToLower(id)
 }
 
 func ChunkText(chunk RAGChunk) string {

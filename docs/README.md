@@ -1,11 +1,11 @@
 # Context Refiner 文档索引
 
-- 文档版本：`v2026.04.18`
-- 更新日期：`2026-04-18`
+- 文档版本：`v2026.04.19`
+- 更新日期：`2026-04-19`
 - 文档类型：`Documentation Index`
 
-> 2026-04-11 起，代码结构请优先以 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md) 为准。
-> 如果你是来看目录分层和职责，不要先看旧的 `docs/code-design.md`，先看新的分层文档。
+> 2026-04-19 起，代码结构请优先以 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md) 为准。
+> 如果你是来看目录分层和职责，先看分层文档，再看 `docs/code-design.md`。
 
 ## 1. 文档集说明
 

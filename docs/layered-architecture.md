@@ -1,7 +1,7 @@
 # Context Refiner Layered Architecture
 
-- 文档版本：`v2026.04.13`
-- 更新日期：`2026-04-13`
+- 文档版本：`v2026.04.19`
+- 更新日期：`2026-04-19`
 - 文档类型：`Architecture Reference`
 - 适用代码基线：`main`
 
@@ -13,7 +13,7 @@
 
 - 对外入口按职责分层，但避免过度抽象
 - 核心链路按业务共性收拢到 `domain`
-- 外部协议、存储、后台 worker 统一视为 `adapter`
+- 外部协议放在 `controller`，接入实现与公共支撑统一收敛到 `support`
 - 观测、装配、公共支持能力独立归位
 - 保持 `cmd` 极薄，业务逻辑不回流到启动层
 
@@ -34,15 +34,12 @@ cmd/
     main.go
 
 internal/
-  adapter/
-    outbound/
-      redis/
-      summary/
   bootstrap/
   controller/
     grpc/
   domain/
     core/
+      components/
       processor/
       repository/
   dto/
@@ -55,6 +52,9 @@ internal/
   service/
   support/
     heuristic/
+    redis/
+    summary/
+    tempo/
     tokenizer/
 
 pkg/
@@ -118,13 +118,15 @@ tests/
   - repository contract
 - 这一层不直接关心 gRPC、Redis、Prometheus 的实现细节
 
-### 3.8 `internal/adapter/`
+### 3.8 `internal/support/`
 
-- 放置外部依赖适配器
+- 放置跨层复用能力与接入实现
 - 当前已拆出：
-  - `adapter/outbound/redis`：Redis repository 实现
-  - `adapter/outbound/summary`：summary worker 与启发式摘要实现
-- 后续如果引入真实摘要模型或其他出站能力，也继续归入该层
+  - `support/redis`：Redis repository 与 dashboard / trace evaluation 持久化实现
+  - `support/summary`：summary worker、provider 与启发式摘要实现
+  - `support/tempo`：Tempo 查询实现
+  - `support/heuristic`、`support/tokenizer`：通用算法与计数能力
+- 后续如果引入真实摘要模型或其他外部接入，也继续按接入对象归入该层
 
 ### 3.9 `internal/observability/`
 
@@ -134,12 +136,15 @@ tests/
   - `observability/tracing`
 - `internal/observability/recorder.go` 保留跨层观测契约
 
-### 3.10 `internal/support/`
+### 3.10 `internal/domain/core/components/`
 
-- 放置跨层复用但不属于主业务链的公共支持能力
+- 放置核心域内可复用组件实现
 - 当前主要包括：
-  - `support/heuristic`
-  - `support/tokenizer`
+  - `TextSanitizer`
+  - `RAGNormalizer`
+  - `PromptComponent`
+  - `FragmentTransformer`
+  - `ChunkMetadataHelper`
 
 ### 3.11 `internal/infra/`
 
@@ -150,7 +155,7 @@ tests/
 ### 3.12 `internal/bootstrap/`
 
 - 负责装配整个运行时
-- 统一串联 `config -> adapter -> domain -> service -> controller`
+- 统一串联 `config -> support -> domain -> service -> controller`
 - 承载 registry 组装、runtime 加载、worker 启动、metrics server 启动
 
 ### 3.13 `pkg/service/`
@@ -170,13 +175,13 @@ tests/
 1. `controller -> service`
 2. `service -> mapper / dto / domain / observability`
 3. `mapper -> dto / domain`
-4. `bootstrap -> controller / service / adapter / observability / config`
-5. `adapter/outbound -> domain/repository contract`
+4. `bootstrap -> controller / service / support / observability / config`
+5. `support/redis|summary|tempo -> domain/repository contract`
 
 不建议出现的反向依赖：
 
 - `domain -> controller`
-- `domain -> adapter concrete implementation`
+- `domain -> support concrete implementation`
 - `service -> redis client concrete details`
 - `controller -> repository`
 
@@ -196,14 +201,14 @@ tests/
 
 1. gRPC 请求进入 controller
 2. service 调用 domain repository contract
-3. [redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go) 作为 Redis 适配实现进行 page / summary 读取
+3. [redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go) 作为 Redis 接入实现进行 page / summary 读取
 4. 优先返回 summary，缺失时回退原 page
 
 `SummaryWorker` 主链：
 
 1. [runtime.go](/E:/github/Memory_chunk/internal/bootstrap/runtime.go) 启动 worker
-2. [summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go) 消费 summary job
-3. [heuristic_summarizer.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/heuristic_summarizer.go) 生成启发式摘要
+2. [summary_worker.go](/E:/github/Memory_chunk/internal/support/summary/summary_worker.go) 消费 summary job
+3. [heuristic_summarizer.go](/E:/github/Memory_chunk/internal/support/summary/heuristic_summarizer.go) 生成启发式摘要
 4. Redis repository 回写 summary artifact
 
 ## 6. 当前关键文件
@@ -221,23 +226,23 @@ tests/
 - [registry.go](/E:/github/Memory_chunk/internal/domain/core/registry.go)
 - [prefix_cache_identity.go](/E:/github/Memory_chunk/internal/domain/core/prefix_cache_identity.go)
 - [repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
-- [redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
+- [redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go)
 - [prometheus_recorder.go](/E:/github/Memory_chunk/internal/observability/metrics/prometheus_recorder.go)
 - [provider.go](/E:/github/Memory_chunk/internal/observability/tracing/provider.go)
 
 ## 7. 本轮已完成结果
 
-- 已把 controller 从旧 `internal/adapter/grpc` 迁到 `internal/controller/grpc`
+- 已把 controller 稳定收敛到 `internal/controller/grpc`
 - 已把核心链路从旧 `internal/core` 迁到 `internal/domain/core`
-- 已把 Redis、summary worker 从旧 `internal/infra/*` 迁到 `internal/adapter/outbound/*`
+- 已把 Redis、summary worker、Tempo 查询统一收敛到 `internal/support/*`
 - 已把 tokenizer 从旧 `internal/infra/tokenizer` 迁到 `internal/support/tokenizer`
 - 已把 metrics / tracing 从旧 `internal/infra/*` 迁到 `internal/observability/*`
 - 已把 request / response mapping 从 `internal/service` 拆到 `internal/mapper`
 - 已补 `tests/unit`、`tests/integration`、`tests/e2e` 目录骨架
 - 已把 `service` 内部主链从 protobuf 直接依赖收敛为 `dto`
 - 已补 `tests/unit/mapper` 边界单测
-- 已完成第一轮职责化命名收尾：
-  说明：核心 processor 已统一为 `*_processor.go / *_helper.go`，Redis 与 summary 出站适配器已统一为职责名文件
+- 已完成 processor 聚合与 core 组件化收口：
+  说明：processor 当前按 `stage_01_preprocess / stage_02_transform / stage_03_compaction / stage_04_finalize` 聚合编排，具体文本 / RAG / prompt 实现下沉到 `core/components`；Redis、summary、Tempo 接入实现统一归入 `support/*`
 - 已修复迁移后的 import 路径，`go test ./...` 可通过
 
 ## 8. 下一步

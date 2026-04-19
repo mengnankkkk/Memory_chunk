@@ -1,7 +1,7 @@
 # Context Refiner Todo / Snapshot
 
-- 文档版本：`v2026.04.18`
-- 更新日期：`2026-04-18`
+- 文档版本：`v2026.04.19`
+- 更新日期：`2026-04-19`
 - 文档类型：`Snapshot / Todo / Archive`
 - 适用代码基线：`main` 分支当前实现
 
@@ -21,6 +21,10 @@
 - 已有 Prometheus / Tracing / Grafana / Tempo 基础观测
 - 已有应用层 `stable prefix` 规范化与分层 prefix hash
 - 已有应用层 `miss reason` 诊断
+- 已完成 `core/components` 首轮组件化收口：
+  说明：`TextSanitizer / RAGNormalizer / PromptComponent` 以及 `FragmentTransformer / ChunkMetadataHelper` 已独立沉到 `internal/domain/core/components`，processor 改为调用组件执行，`prefix_cache_identity` 的 stable prefix section 拼接已委托 Prompt 组件
+- 已完成接入实现并入 `support`：
+  说明：当前 `support` 下已形成 `support/redis`、`support/summary`、`support/tempo`，同时承载通用支撑与按接入对象分类的实现
 - 已有应用层 cache 策略：
   说明：`admission policy`、`namespace`、`TTL 分层`、`热点前缀统计`、`prewarm`
 - 已完成应用边界收口：
@@ -30,7 +34,7 @@
 - 已完成应用层预测 metadata 首轮落地：
   说明：`RefineResponse.metadata` 已补 `cache_observation_level`、`cache_prediction_result`、`predicted_reusable_tokens`、`segment_churn_reason`
 - 已有结构化 `SummaryArtifact`，worker 已切到 `Provider -> SummaryArtifact -> Redis store` 链路
-- 已完成工程目录整体重构（`controller / service / mapper / dto / domain / adapter / observability / bootstrap / tests`）
+- 已完成工程目录整体重构（`controller / service / mapper / dto / domain / support / observability / bootstrap / tests`）
 - 已有少量单元测试起步，`go test ./...` 当前可通过
 
 ### 1.3 当前应用层 KV 优化完成度
@@ -56,9 +60,9 @@
 - 当前虽然已有基础 overview dashboard，但还没有离线 replay / prefix churn / top miss dashboard / alerting
 - 当前前缀分段仍为 `system / memory / rag` 三段，`tools` schema 被并入 system，变更时会触发误判
 - 当前 miss 诊断仍是"整条前缀"粒度，尚无 segment-level 部分复用语义
-- 当前 active turn 完全不归一化，多轮同话题复用潜力未被挖掘
-- 当前基础清洗更偏"在线 prompt 规范化与压缩"而非"离线入库预处理"：
-  说明：已有 `collapse / compact / canonicalize / json_trim / table_reduce / code_outline / error_stack_focus / snip`，但尚未形成独立 `TextSanitizer`、文档预处理管线或代码 cleaner SDK
+- 当前 active turn 仅做轻量规范化，多轮同话题下的高抖动字段去抖潜力仍未被挖掘
+- 当前基础清洗虽已完成首轮组件化，但仍更偏"在线 prompt 规范化与压缩"而非"离线入库预处理"：
+  说明：已形成独立 `TextSanitizer / RAGNormalizer / PromptComponent`，并补齐 HTML/XML/emoji/Unicode 噪音清洗与统一清洗报告；但文档预处理管线、sentence-aware chunking 与代码 cleaner SDK 仍未建立
 
 ## 2. 未完成任务
 
@@ -107,7 +111,7 @@
 - [ ] **NEW 2026-04-18** 前缀分段从 3 段升级为 4 段（tools 独立）
   说明：当前 `tools` schema 被并入 system，一旦工具集变更就会误触发 `system_changed`。拟拆出独立 `tools` 段，新增 `tools_prefix_hash` 与 `tools_prefix_tokens`，纳入 admission / miss reason / namespace 体系。收益是让 tool schema 抖动不再污染 system 稳定性指标
 - [ ] **NEW 2026-04-18** active turn 内部轻量去抖
-  说明：active turn 当前完全不规范化。用户输入常夹带时间戳、粘贴的 URL query、会话 ID 等高抖动片段。拟做不改变语义的保守清洗（timestamp / URL query / 粘贴 session id），提升多轮同话题时的前缀延续性。注意边界：绝不改变语义，仅处理可证明无语义影响的抖动字段
+  说明：active turn 当前只做空白与换行级轻量规范化。用户输入仍常夹带时间戳、粘贴的 URL query、会话 ID 等高抖动片段。拟继续做不改变语义的保守清洗（timestamp / URL query / 粘贴 session id），提升多轮同话题时的前缀延续性。注意边界：绝不改变语义，仅处理可证明无语义影响的抖动字段
 - [ ] **NEW 2026-04-18** `prompt_layout_version` 纳入 miss reason 维度
   说明：当前该字段已存在但未参与诊断。拟在 layout 变更时独立归类为 `layout_changed`，与 `normalization_changed` 分开统计，避免架构级版本升级污染日常 churn 观察
 
@@ -141,14 +145,8 @@
 
 ### 2.4 基础清洗与入库预处理补齐
 
-- [ ] 设计独立 `TextSanitizer` 组件
-  说明：当前清洗规则分散在 `collapse / compact / canonicalize` 与若干 heuristic 中，缺少统一入口、统一配置、统一输出；拟收口为“原始文本 -> 干净文本 + 清洗报告”的独立组件
-- [ ] 补齐通用文本去噪规则
-  说明：当前已支持空白归一化、时间戳/UUID/trace/request/session 等高抖动字段规范化，以及 JSON 稳定化；但尚未支持 HTML 标签剥离、`script/style` 去除、emoji 去除、Unicode 控制字符过滤、XML 噪音清理
 - [ ] 为通用文本清洗增加可扩展 Hook
   说明：内置规则之外，需允许业务侧按来源（scraping / log / docs / social）插入自定义 sanitizer rule，避免把项目内通用规则写死
-- [ ] 增加统一清洗报告对象
-  说明：当前只有 step audit 与 trace evaluation 分散记录；拟补 `sanitizer report`，至少包含输入 token、输出 token、删除字符/片段数、命中规则、去重率
 - [ ] 增加“句子切分 -> token chunk”预处理路径
   说明：当前分页主要是按行/按 rune 切分，`SplitSentences` 仅用于摘要器；拟增加面向 RAG 入库的 sentence-aware chunking，避免正文在句中断裂
 - [ ] 设计结构化文档预处理管线
@@ -179,11 +177,11 @@
 - [ ] **NEW 2026-04-18** RAG 语义去重（embedding 相似度阈值合并）
   说明：当前 RAG chunks 仅做稳定排序，未处理跨 chunk 的语义重复。低相关与语义重复是降低回答质量的两大来源，拟在 rerank 之后增加一层 embedding 去重层，阈值内视为同一语义事实并保留分数最高的那一段
 
-### 2.6 当前建议顺序（更新 2026-04-18）
+### 2.6 当前建议顺序（更新 2026-04-19）
 
 1. 先补 `service mapping / summary / config` 最小单测闭环
 2. 再补 `Refine / PageIn / Redis / worker` 集成测试，并继续收拢到 `tests/integration`
-3. 然后补齐“基础清洗与入库预处理”专题，优先落 `TextSanitizer`、sentence-aware chunking、文档标题分段与代码注释安全清洗
+3. 然后继续推进“基础清洗 / 入库预处理”专题，优先补 `TextSanitizer Hook`、sentence-aware chunking、文档标题分段与代码注释安全清洗
 4. 再推进 `Explain / dry-run / cache debug`，把预测结果做成可解释输出
 5. 启动前缀四段分层（tools 独立）与 active turn 轻量去抖，作为 KV 命中优化的下一块基石
 6. 再补应用层低基数 metrics、dashboard 与离线 replay
@@ -191,6 +189,21 @@
 8. 设计 segment-level 部分复用语义，并尝试接入下游真实 KV 指标做对照验证
 
 ## 3. 已完成任务归档
+
+### 2026-04-19 / core 组件层首轮抽取与清洗收口
+
+- [x] 抽出独立 `TextSanitizer` 组件
+  说明：已形成“原始文本 -> 清洗后文本 + 清洗报告”的统一入口，`collapse / compact / canonicalize` 不再各自维护分散规则
+- [x] 补齐通用文本去噪规则
+  说明：已支持 HTML 标签剥离、`script/style` 去除、emoji 去除、Unicode 控制字符过滤，以及 XML 声明 / doctype / comment / CDATA 噪音清理
+- [x] 抽出独立 `RAGNormalizer` 组件
+  说明：RAG chunk/source/fragment 的稳定化、JSON 去 volatile keys、source/pageRef 归一化已统一收口
+- [x] 抽出独立 `PromptComponent` 组件
+  说明：prompt 组装、stable segment 切分、chunk/message 渲染、stable prefix section 拼接已下沉到组件层，`prefix_cache_identity` 不再自行做版式拼装
+- [x] 补齐组件辅助层并切换 processor 调用关系
+  说明：`FragmentTransformer`、`ChunkMetadataHelper` 已一并沉到 `internal/domain/core/components`；processor 改为调用组件执行；`core/text_sanitizer.go`、`core/rag_normalizer.go`、`core/prompt_component.go` 旧包装文件已删除
+- [x] 完成 `core` façade / bridge 层首轮瘦身
+  说明：`component_access.go` 已拆为 `component_defaults.go` 与 `components_bridge.go`；stable prefix section 生成已下沉到 `PromptComponent.BuildStablePrefixSectionsFromMessages`；`BuildPrefixCacheIdentity` 与 `StableRAGChunks` 改为纯委托组件执行，`core` 不再保留对应 section 拼装与排序辅助逻辑
 
 ### 2026-04-18 / 统一输入结构切换为 system + messages + memory
 
@@ -230,20 +243,20 @@
 ### 2026-04-18 / 工程目录重构整体收尾（原 2.0 归档）
 
 - [x] 明确接近 Java 风格的目标目录骨架
-  说明：目录目标收敛为 `cmd / api / config / docs / deploy / internal / tests`，`internal` 内形成 `controller / service / mapper / dto / domain / adapter / support / observability / bootstrap` 分层
+  说明：目录目标收敛为 `cmd / api / config / docs / deploy / internal / tests`，`internal` 内形成 `controller / service / mapper / dto / domain / support / observability / bootstrap` 分层
 - [x] 明确应用入口层的 OO 拆分方式
   说明：对外入口统一按 `controller -> service -> mapper -> dto` 分层
 - [x] 拆出独立测试目录
   说明：收敛为 `tests/unit`、`tests/integration`、`tests/e2e`
 - [x] 核心链路代码收拢到 `domain/core`
 - [x] 观测与监控代码收拢到 `observability` 模块族
-- [x] 适配层按 `adapter/inbound` 与 `adapter/outbound` 归位
+- [x] 接入实现统一收敛到 `support/*`
 - [x] 公共支持代码收拢到 `support` 模块
 - [x] 启动装配与运行时 wiring 收拢到 `bootstrap`
 - [x] 统一文件夹与文件命名规范
   说明：已在多轮命名收尾中贯穿完成，后续局部调整纳入日常 PR
 - [x] 分阶段迁移纪律
-  说明：已按"先分层 -> 再拆测试 -> 再迁应用层 -> 再迁 domain -> 再迁 observability/adapter/bootstrap -> 清理 import 与命名"顺序分四轮稳步推进，未发生一次性大搬家
+  说明：已按"先分层 -> 再拆测试 -> 再迁应用层 -> 再迁 domain -> 再迁 observability/support/bootstrap -> 清理 import 与命名"顺序分四轮稳步推进，未发生一次性大搬家
 
 ### 2026-04-18 / 应用层 KV 下一阶段调研结论归档（原 2.3.0）
 
@@ -272,11 +285,11 @@
 ### 2026-04-13 / 工程目录重构第一阶段已完成
 
 - [x] 完成第一轮目录骨架归位
-  说明：已形成 `internal/controller`、`internal/service`、`internal/mapper`、`internal/dto`、`internal/domain`、`internal/adapter/outbound`、`internal/observability`、`internal/support`、`internal/bootstrap`
+  说明：已形成 `internal/controller`、`internal/service`、`internal/mapper`、`internal/dto`、`internal/domain`、`internal/support`、`internal/observability`、`internal/bootstrap`
 - [x] 完成核心链路迁移
   说明：`pipeline / registry / prefix cache / processor / repository contract` 已迁入 `internal/domain/core`
 - [x] 完成适配层与观测层归位
-  说明：`grpc controller` 迁入 `internal/controller/grpc`，`redis / summary worker` 迁入 `internal/adapter/outbound`，`prometheus / tracing` 迁入 `internal/observability`
+  说明：`grpc controller` 迁入 `internal/controller/grpc`，`redis / summary worker / tempo query` 当前收敛在 `internal/support`，`prometheus / tracing` 迁入 `internal/observability`
 - [x] 完成 mapper 独立拆包
 - [x] 完成测试目录落地
 - [x] 完成 import 回收与编译恢复
@@ -292,7 +305,7 @@
 ### 2026-04-13 / 命名规范收尾第一轮已完成
 
 - [x] 完成 processor 目录第一轮职责化命名
-- [x] 完成 adapter/outbound 第一轮职责化命名
+- [x] 完成 support 接入对象命名收口
 - [x] 完成 domain 契约与前缀身份文件命名收尾
 - [x] 完成相关文档与说明路径同步
 - [x] 保持编译与测试通过

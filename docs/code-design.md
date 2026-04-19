@@ -1,7 +1,7 @@
 # Context Refiner 代码设计说明
 
-- 文档版本：`v2026.04.13`
-- 更新日期：`2026-04-13`
+- 文档版本：`v2026.04.19`
+- 更新日期：`2026-04-19`
 - 文档类型：`Code Reference`
 - 适用代码基线：`main`
 
@@ -35,15 +35,12 @@ config/
 docs/
 
 internal/
-  adapter/
-    outbound/
-      redis/
-      summary/
   bootstrap/
   controller/
     grpc/
   domain/
     core/
+      components/
       processor/
       repository/
   dto/
@@ -56,6 +53,9 @@ internal/
   service/
   support/
     heuristic/
+    redis/
+    summary/
+    tempo/
     tokenizer/
 
 pkg/
@@ -114,7 +114,7 @@ pkg/
 
 职责：
 
-- 装配 `infra/config -> adapter/outbound -> domain -> service -> controller`
+- 装配 `infra/config -> support -> domain -> service -> controller`
 - 构建 registry、page store、gRPC server、summary worker
 - 把启动时依赖集中在一层，避免散落到 `main`
 
@@ -180,36 +180,33 @@ pkg/
 
 职责：
 
-- 放置具体上下文治理动作
-- 每个 processor 保持单一职责
-- 通过 registry 被 pipeline 按策略编排执行
+- 放置具体上下文治理动作的编排层
+- processor 只负责编排，具体文本 / RAG / prompt 实现优先下沉到 `core/components`
+- 通过 registry 被 pipeline 按策略顺序执行
+- 当前按阶段聚合文件组织，而不是为每个 processor 单独拆文件
 
 关键文件：
 
-- [internal/domain/core/processor/request_clone_helper.go](/E:/github/Memory_chunk/internal/domain/core/processor/request_clone_helper.go)
-- [internal/domain/core/processor/token_split_helper.go](/E:/github/Memory_chunk/internal/domain/core/processor/token_split_helper.go)
-- [internal/domain/core/processor/chunk_metadata_helper.go](/E:/github/Memory_chunk/internal/domain/core/processor/chunk_metadata_helper.go)
-- [internal/domain/core/processor/paging_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/paging_processor.go)
-- [internal/domain/core/processor/collapse_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/collapse_processor.go)
-- [internal/domain/core/processor/compact_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/compact_processor.go)
-- [internal/domain/core/processor/canonicalize_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/canonicalize_processor.go)
-- [internal/domain/core/processor/structured_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/structured_processors.go)
-- [internal/domain/core/processor/snip_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/snip_processor.go)
-- [internal/domain/core/processor/auto_compact_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/auto_compact_processor.go)
-- [internal/domain/core/processor/assemble_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/assemble_processor.go)
+- [internal/domain/core/processor/stage_01_preprocess_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_01_preprocess_processors.go)
+- [internal/domain/core/processor/stage_02_transform_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_02_transform_processors.go)
+- [internal/domain/core/processor/stage_03_compaction_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_03_compaction_processors.go)
+- [internal/domain/core/processor/stage_04_finalize_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_04_finalize_processors.go)
+- [internal/domain/core/processor/processor_support.go](/E:/github/Memory_chunk/internal/domain/core/processor/processor_support.go)
 
-### 3.11 `internal/adapter/outbound/`
+### 3.11 `internal/domain/core/components/`
 
 职责：
 
-- 承载面向外部系统的出站适配实现
-- 当前包括 Redis repository implementation 与 summary worker
+- 承载文本清洗、RAG 规范化、prompt 组装等可复用实现
+- 为 processor 提供统一组件能力，避免把实现细节分散在 pipeline / heuristic 中
 
 关键文件：
 
-- [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
-- [internal/adapter/outbound/summary/summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go)
-- [internal/adapter/outbound/summary/heuristic_summarizer.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/heuristic_summarizer.go)
+- [internal/domain/core/components/text_sanitizer.go](/E:/github/Memory_chunk/internal/domain/core/components/text_sanitizer.go)
+- [internal/domain/core/components/rag_normalizer.go](/E:/github/Memory_chunk/internal/domain/core/components/rag_normalizer.go)
+- [internal/domain/core/components/prompt_component.go](/E:/github/Memory_chunk/internal/domain/core/components/prompt_component.go)
+- [internal/domain/core/components/fragment_transformer.go](/E:/github/Memory_chunk/internal/domain/core/components/fragment_transformer.go)
+- [internal/domain/core/components/chunk_metadata_helper.go](/E:/github/Memory_chunk/internal/domain/core/components/chunk_metadata_helper.go)
 
 ### 3.12 `internal/infra/config/`
 
@@ -240,14 +237,19 @@ pkg/
 
 职责：
 
-- 存放跨层复用的辅助能力
-- 当前主要是 `heuristic` 文本整理规则
+- 存放跨层复用能力与接入实现
+- 当前已按接入对象分为 `redis / summary / tempo`
+- 通用算法与工具继续保留在 `heuristic / tokenizer`
 
 关键文件：
 
 - [internal/support/heuristic/json.go](/E:/github/Memory_chunk/internal/support/heuristic/json.go)
 - [internal/support/heuristic/extract.go](/E:/github/Memory_chunk/internal/support/heuristic/extract.go)
 - [internal/support/heuristic/lines.go](/E:/github/Memory_chunk/internal/support/heuristic/lines.go)
+- [internal/support/redis/redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go)
+- [internal/support/summary/summary_worker.go](/E:/github/Memory_chunk/internal/support/summary/summary_worker.go)
+- [internal/support/summary/heuristic_summarizer.go](/E:/github/Memory_chunk/internal/support/summary/heuristic_summarizer.go)
+- [internal/support/tempo/tempo_repository.go](/E:/github/Memory_chunk/internal/support/tempo/tempo_repository.go)
 
 ## 4. 公开 API 与内部实现边界
 
@@ -258,8 +260,8 @@ pkg/
 - `internal/service/` 是应用服务实现
 - `internal/domain/core/` 是核心业务内核
 - `internal/domain/core/repository/` 是持久化契约边界
-- `internal/adapter/outbound/` 是底层实现细节
-- `internal/controller/grpc/` 是 transport adapter
+- `internal/support/redis|summary|tempo` 是接入实现细节
+- `internal/controller/grpc/` 是 transport controller 入口
 
 这样做的直接结果是：
 
@@ -283,7 +285,7 @@ type RefinerService interface {
 意义：
 
 - 这是应用对外暴露的最小服务面
-- gRPC handler 只是这个接口的一种 adapter
+- gRPC handler 只是这个接口的一种 controller / transport 实现
 - `pkg/client` 也围绕这个接口工作
 
 ### 5.2 `Pipeline`
@@ -293,7 +295,7 @@ type RefinerService interface {
 - 统一 Token 计数口径
 - 按策略顺序执行 processor
 - 汇总 step audit 与 semantic audit
-- 产出最终 `optimized_prompt`
+- 产出最终内部 prompt 与统一 audit 结果
 
 对应代码：
 
@@ -325,7 +327,7 @@ type RefinerService interface {
 
 当前 Redis 实现位于：
 
-- [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
+- [internal/support/redis/redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go)
 
 ## 6. 请求主链
 
@@ -345,9 +347,9 @@ type RefinerService interface {
 
 代码主链：
 
-1. gRPC 请求进入 adapter
+1. gRPC 请求进入 controller
 2. service 层校验并遍历 `page_keys`
-3. 通过 [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go) 定义的 `PageRepository` 优先读取 summary，底层当前由 [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go) 实现
+3. 通过 [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go) 定义的 `PageRepository` 优先读取 summary，底层当前由 [internal/support/redis/redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go) 实现
 4. service 层组装 `PageInResponse`
 5. `StoredPage` 在保持 `content / is_summary / summary_job_id` 兼容字段的同时，额外返回结构化 `summary_artifact`
 
@@ -358,6 +360,12 @@ type RefinerService interface {
 - 单一职责：每个 processor 只负责一类变换
 - 可编排：是否执行由 policy step 决定
 - 可解释：执行结果进入 audit，而不是静默改写
+
+补充说明：
+
+- 这里的 processor 名称表示“步骤”，不是“文件一对一实现”
+- 当前文件组织按 `stage_01` 到 `stage_04` 聚合
+- `collapse / compact / canonicalize / assemble` 等步骤内部会优先委托 `core/components`，processor 本身只保留编排与胶水逻辑
 
 当前重要 processor：
 
@@ -373,11 +381,11 @@ type RefinerService interface {
 
 相关代码：
 
-- [internal/domain/core/processor/paging_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/paging_processor.go)
-- [internal/domain/core/processor/collapse_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/collapse_processor.go)
-- [internal/domain/core/processor/structured_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/structured_processors.go)
-- [internal/domain/core/processor/auto_compact_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/auto_compact_processor.go)
-- [internal/domain/core/processor/assemble_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/assemble_processor.go)
+- [internal/domain/core/processor/stage_01_preprocess_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_01_preprocess_processors.go)
+- [internal/domain/core/processor/stage_02_transform_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_02_transform_processors.go)
+- [internal/domain/core/processor/stage_03_compaction_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_03_compaction_processors.go)
+- [internal/domain/core/processor/stage_04_finalize_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_04_finalize_processors.go)
+- [internal/domain/core/components/prompt_component.go](/E:/github/Memory_chunk/internal/domain/core/components/prompt_component.go)
 
 ## 8. 基础设施与适配层设计
 
@@ -395,7 +403,7 @@ type RefinerService interface {
 
 对应代码：
 
-- [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
+- [internal/support/redis/redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go)
 
 ### 8.3 Summary Worker
 
@@ -405,8 +413,8 @@ type RefinerService interface {
 
 对应代码：
 
-- [internal/adapter/outbound/summary/summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go)
-- [internal/adapter/outbound/summary/heuristic_summarizer.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/heuristic_summarizer.go)
+- [internal/support/summary/summary_worker.go](/E:/github/Memory_chunk/internal/support/summary/summary_worker.go)
+- [internal/support/summary/heuristic_summarizer.go](/E:/github/Memory_chunk/internal/support/summary/heuristic_summarizer.go)
 
 ### 8.4 Tokenizer
 
@@ -431,11 +439,12 @@ type RefinerService interface {
 
 推荐步骤：
 
-1. 在 [internal/domain/core/processor](/E:/github/Memory_chunk/internal/domain/core/processor) 新增实现
-2. 实现 `Descriptor()` 与 `Process()`
-3. 在 [internal/bootstrap/processors.go](/E:/github/Memory_chunk/internal/bootstrap/processors.go) 注册
-4. 在 `config/policies.yaml` 中编排 step
-5. 补对应测试与文档
+1. 先判断逻辑是否应下沉到 [internal/domain/core/components](/E:/github/Memory_chunk/internal/domain/core/components) 复用
+2. 再把 processor 编排代码放入对应阶段聚合文件
+3. 实现 `Descriptor()` 与 `Process()`
+4. 在 [internal/bootstrap/processors.go](/E:/github/Memory_chunk/internal/bootstrap/processors.go) 注册
+5. 在 `config/policies.yaml` 中编排 step
+6. 补对应测试与文档
 
 ### 9.2 新增传输层
 
@@ -463,10 +472,10 @@ type RefinerService interface {
 4. [internal/controller/grpc/refine_controller.go](/E:/github/Memory_chunk/internal/controller/grpc/refine_controller.go)
 5. [internal/service/refine_service.go](/E:/github/Memory_chunk/internal/service/refine_service.go)
 6. [internal/domain/core/pipeline.go](/E:/github/Memory_chunk/internal/domain/core/pipeline.go)
-7. [internal/domain/core/processor/paging_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/paging_processor.go)
+7. [internal/domain/core/processor/stage_01_preprocess_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_01_preprocess_processors.go)
 8. [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
-9. [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
-10. [internal/adapter/outbound/summary/summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go)
+9. [internal/support/redis/redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go)
+10. [internal/support/summary/summary_worker.go](/E:/github/Memory_chunk/internal/support/summary/summary_worker.go)
 
 ## 11. 当前设计判断
 
@@ -491,6 +500,6 @@ type RefinerService interface {
 
 这使它更像典型 Java 应用的结构：
 
-`api -> service interface -> application service -> core domain -> infra implementation -> bootstrap -> main`
+`api -> service interface -> application service -> core domain -> support implementation -> bootstrap -> main`
 
-后续如果继续演进，最重要的是守住这个边界，不要再把逻辑倒灌回 adapter 或 main。
+后续如果继续演进，最重要的是守住这个边界，不要再把逻辑倒灌回 support 实现层或 main。

@@ -1,11 +1,11 @@
 # Context Refiner 总体架构设计
 
-- 文档版本：`v2026.04.13`
-- 更新日期：`2026-04-13`
+- 文档版本：`v2026.04.19`
+- 更新日期：`2026-04-19`
 - 文档类型：`Architecture Overview`
 - 适用代码基线：`main` 分支当前实现
 
-> 2026-04-11 结构重构后，分层实现与目录职责请结合 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md) 一起看。
+> 2026-04-19 结构重构与组件化收口后，分层实现与目录职责请结合 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md) 一起看。
 
 ## 1. 文档目标
 
@@ -44,7 +44,7 @@
 当前架构面向以下目标：
 
 - 统一 Token 口径，避免估算逻辑前后不一致
-- 把清洗过程拆成独立 Processor，避免大函数堆逻辑
+- 把步骤编排留在 Processor，把可复用清洗/规范化/组装逻辑下沉到 `core/components`
 - 支持结构化 RAG 输入，而不是只处理纯字符串
 - 支持可解释审计，避免做了 lossy 压缩却无法追责
 - 支持分页与异步摘要，为后续缓存复用和重型压缩能力打底
@@ -69,27 +69,34 @@
 Client / App
     |
     v
-gRPC Adapter
+gRPC Controller
     |
     v
-Application Service
+Application Service + Mapper
     |
     v
 Core Pipeline
     |
-    +--> Processor Chain
-    |      |- paging
-    |      |- collapse
-    |      |- compact
-    |      |- structured processors
-    |      |- snip
-    |      |- auto_compact_sync
-    |      |- auto_compact_async
-    |      `- assemble
+    +--> Processor Stages
+    |      |- stage_01_preprocess
+    |      |- stage_02_transform
+    |      |- stage_03_compaction
+    |      `- stage_04_finalize
+    |
+    +--> Core Components
+    |      |- TextSanitizer
+    |      |- RAGNormalizer
+    |      |- PromptComponent
+    |      |- FragmentTransformer
+    |      `- ChunkMetadataHelper
+    |
+    +--> Support
+    |      |- redis repositories
+    |      |- summary worker / provider
+    |      |- tempo repository
+    |      `- tokenizer / heuristic
     |
     +--> Audit Output
-    |
-    +--> Infra Store / Summary Queue / Tokenizer / Observability
     |
     `--> PageIn / Summary Fallback
 ```
@@ -150,10 +157,11 @@ Core Pipeline
 
 职责：
 
-- 每个 Processor 只做单一职责的清洗/压缩动作
-- 避免把复杂规则塞回引擎
+- 每个 Processor 只负责一个处理步骤的编排
+- 避免把复杂规则塞回引擎或塞回单个巨型文件
 - 形成稳定的扩展点
 - 在应用层尽可能把输入稳定化，减少 prompt 形态抖动
+- 当前文件组织按阶段聚合，而不是为每个步骤单独拆文件
 
 当前已实现的 Processor：
 
@@ -170,7 +178,30 @@ Core Pipeline
 - `auto_compact_async`
 - `assemble`
 
-### 6.5 State / Queue 层
+当前实现形态：
+
+- `stage_01_preprocess`：预处理与前置治理
+- `stage_02_transform`：结构/内容变换
+- `stage_03_compaction`：压缩、摘要触发与稳定化
+- `stage_04_finalize`：最终组装与收尾
+
+### 6.5 Core Components 层
+
+职责：
+
+- 承载文本清洗、RAG 规范化、prompt 组装、片段转换、chunk metadata 辅助等可复用实现
+- 统一规则顺序、统一配置入口、统一输出结构
+- 为 processor 提供可复用执行单元，避免规则散落在 `pipeline / heuristic / prefix identity` 中
+
+当前实现：
+
+- `TextSanitizer`
+- `RAGNormalizer`
+- `PromptComponent`
+- `FragmentTransformer`
+- `ChunkMetadataHelper`
+
+### 6.6 State / Queue 层
 
 职责：
 
@@ -184,11 +215,11 @@ Core Pipeline
 
 - [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
 - [internal/observability/recorder.go](/E:/github/Memory_chunk/internal/observability/recorder.go)
-- [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
-- [internal/adapter/outbound/summary/summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go)
+- [internal/support/redis/redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go)
+- [internal/support/summary/summary_worker.go](/E:/github/Memory_chunk/internal/support/summary/summary_worker.go)
 - [internal/observability/metrics/prometheus_recorder.go](/E:/github/Memory_chunk/internal/observability/metrics/prometheus_recorder.go)
 
-### 6.6 Egress 层
+### 6.7 Egress 层
 
 职责：
 
@@ -254,7 +285,7 @@ Core Pipeline
 
 ```text
 RefineRequest
-  -> gRPC adapter
+  -> gRPC controller
   -> mapRequest
   -> resolve policy
   -> build pipeline

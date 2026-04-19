@@ -1,290 +1,196 @@
 # Context Refiner 实施计划与路线图
 
-- 文档版本：`v2026.04.11`
-- 更新日期：`2026-04-11`
+- 文档版本：`v2026.04.19`
+- 更新日期：`2026-04-19`
 - 文档类型：`Roadmap / Plan`
 - 适用代码基线：`main` 分支当前实现
 
 ## 1. 当前阶段结论
 
-基于当前代码、构建结果和仓库状态，项目当前处于：
+基于当前代码和文档同步结果，项目当前处于：
 
-`Phase 1 完成度较高，正在进入 Phase 2 与 Phase 3 的交界阶段`
+`核心底盘已成型，应用层 KV A-D 已落地，正在补测试 / Explain / 评测 / 摘要升级这四条产品化主线`
 
 换句话说：
 
-- 核心底盘已经搭出来了
-- 但工程化和产品化能力还没有补齐
+- 分层、主链、prefix cache、观测底座已经不是“概念草图”
+- 但 explain/debug、测试闭环、离线评测、真实摘要 provider 仍未完成
 
 ## 2. 当前已经完成的里程碑
 
-### 2.1 核心主链
+### 2.1 工程结构与主链
 
-- gRPC 协议与服务端接通
-- protobuf 代码已生成
-- tokenizer 统一使用 `tiktoken-go`
-- pipeline + registry 已打通
-- processor capability 已引入
-- 最终 prompt 组装已统一
+- `controller / service / mapper / dto / domain / support / observability / bootstrap / tests` 已收敛为当前目录结构
+- `Refine / PageIn / SummaryWorker` 主链已稳定
+- `pipeline + registry + processor` 主链已打通
+- `support` 已吸收原独立接入实现，当前按 `redis / summary / tempo` 分类
 
-### 2.2 上下文治理能力
+### 2.2 core 组件化
 
-- 结构化 `RAGFragment`
-- Redis page-out / page-in
-- 去重折叠
-- 安全微压缩
-- `snip`
-- 结构化处理器
-- 异步摘要排队
-- summary worker 消费与写回
-- 语义审计
+- `TextSanitizer` 已统一文本清洗入口、顺序和清洗报告
+- `RAGNormalizer` 已统一 RAG 排序、规范化与去抖
+- `PromptComponent` 已统一 prompt section 组装与 stable prefix section 生成
+- `FragmentTransformer / ChunkMetadataHelper` 已抽成独立组件
+- processor 当前已按 `stage_01` 到 `stage_04` 聚合，职责更偏编排层
 
-### 2.3 代码状态
+### 2.3 应用层 KV 与摘要底座
 
-- `go build ./...` 可通过
-- `go test ./...` 可执行，但全部包为 `no test files`
-- 默认配置仍为占位值，不能直接启动生产实例
+- 应用层 KV A/B/C/D 已完成：规范化增强、分层 prefix 身份、miss reason、admission/TTL/prewarm 策略
+- `SummaryProvider` 抽象、启发式 provider、结构化 `SummaryArtifact` 已落地
+- `PageIn` 已优先返回有效 summary artifact，失效时回退原 page
 
-## 3. 当前未完成但优先级最高的事项
+### 2.4 质量与观测现状
 
-### 3.1 摘要产品化
+- 已有 Prometheus / Tracing / Grafana / Tempo 基线
+- 已有少量单测起步，但还未覆盖主链
+- 文档体系已切分为 architecture / code / principles / plan / todo / test plan
 
-当前问题：
+## 3. 当前最高优先级事项
 
-- worker 已有，但仍是启发式摘要
-- 没有 Provider 抽象
-- 没有稳定的 chunk 级摘要对象
+### 3.1 测试闭环
 
-目标：
+当前缺口：
 
-- 允许启发式与 LLM 两种 Provider 并存
-- 摘要结果具备元数据、版本、过期策略
-- `PageIn` 不再只读 page 级 summary 字符串
-
-### 3.2 观测与评测
-
-当前问题：
-
-- Prometheus 指标已接入，但还缺 tracing 与系统化评测
-- 没有 Trace
-- 没有标准评测样本
-- 没有回归度量
+- `service / mapping / summary / config` 还没有最小单测闭环
+- `Refine / PageIn / Redis / worker` 还没有稳定的集成测试
 
 目标：
 
-- 能观察输入/输出 Token
-- 能定位热点 Processor
-- 能评估 page-out、summary 命中和 budget 达标率
+- 先形成最小回归护栏
+- 再让后续 explain、清洗规则、摘要升级有可验证基础
 
-### 3.3 测试与可运行性
+### 3.2 Explain / Debug / 评测
 
-当前问题：
+当前缺口：
 
-- 没有单测
-- 没有集成测试
-- 没有本地一键运行指引
+- 还没有 `dry_run / explain / cache debug`
+- 还没有 replay 驱动的离线评测
+- 还没有“预测可复用”与真实命中效果的系统对照
 
 目标：
 
-- 补最小测试闭环
-- 补最小启动闭环
+- 把应用层 prefix cache 诊断从“metadata 已存在”升级成“能解释、能回放、能比较”
+
+### 3.3 摘要链路升级
+
+当前缺口：
+
+- 真实外部摘要 provider 未接入
+- worker retry / claim 策略未补
+- chunk 级摘要索引未完成
+
+目标：
+
+- 保持主链可降级
+- 在不破坏现有启发式闭环的前提下接入更真实的摘要能力
+
+### 3.4 基础清洗与入库预处理
+
+当前缺口：
+
+- `TextSanitizer` 解决的是在线清洗统一入口，不是完整离线预处理管线
+- sentence-aware chunking、文档标题层级识别、代码 cleaner SDK 仍未建立
+
+目标：
+
+- 把“请求时清洗”扩展到“入库前结构化预处理”
 
 ## 4. 推荐分阶段推进
 
-## Phase 2：摘要产品化
+### Phase 2：质量闭环
 
-### 目标
+重点：
 
-把当前启发式闭环升级成可扩展摘要能力。
+- 补最小单测
+- 补最小集成测试
+- 补最小本地运行与配置说明
 
-### 建议拆分
+验收标准：
 
-#### 2.1 Provider 抽象
+- `service / mapping / summary / config` 有回归护栏
+- `Refine / PageIn / worker` 至少有一条集成主链可验证
 
-引入类似接口：
+### Phase 3：Explain / 评测闭环
 
-```go
-type SummaryProvider interface {
-    Name() string
-    Summarize(ctx context.Context, job SummaryJob) (SummaryArtifact, error)
-}
-```
+重点：
 
-#### 2.2 Summary Artifact 升级
+- `dry_run`
+- `explain metadata`
+- `cache debug`
+- replay 数据集与离线比较工具
 
-建议从纯字符串扩展为结构化对象，至少包含：
+验收标准：
 
-- `artifact_id`
-- `session_id`
-- `request_id`
-- `chunk_id`
-- `content_hash`
-- `summary_text`
-- `fragment_types`
-- `provider`
-- `created_at`
-- `expires_at`
+- 能解释 prefix 为什么命中或 miss
+- 能比较不同清洗 / layout 策略的收益差异
 
-#### 2.3 失效与重试
+### Phase 4：摘要链路升级
 
-- 基于 `content_hash` 变化失效
-- 基于 TTL 过期
-- 基于 provider 版本触发重建
-- provider 失败时保留启发式降级路径
+重点：
 
-### 验收标准
+- 接真实外部 provider
+- 补 retry / claim
+- 推进 chunk 级摘要索引
 
-- 外部模型故障不影响 `Refine` 主链返回
-- 有效期内同一内容可稳定复用摘要
-- `PageIn` 能区分原始 page 与结构化 summary
+验收标准：
 
-## Phase 3：观测与评测
+- 外部 provider 故障不影响主链返回
+- 摘要 artifact 具备稳定版本与失效治理
 
-### 目标
+### Phase 5：入库预处理与更深层缓存语义
 
-把“感觉有效”升级成“可度量、可回归、可定位问题”。
+重点：
 
-### 第一批指标
+- sentence-aware chunking
+- 标题层级 / 章节边界识别
+- 代码 cleaner SDK
+- 四段 prefix 与 segment-level 部分复用
 
-- `context_refiner_refine_requests_total`
-- `context_refiner_refine_duration_seconds`
-- `context_refiner_pagein_requests_total`
-- `context_refiner_pagein_duration_seconds`
-- `context_refiner_tokens_total`
-- `context_refiner_prompt_segments_total`
-- `context_refiner_pipeline_step_duration_seconds`
-- `context_refiner_pipeline_step_tokens_total`
-- `context_refiner_page_artifact_writes_total`
-- `context_refiner_store_page_loads_total`
-- `context_refiner_summary_jobs_total`
+验收标准：
 
-### 第一批 Trace 观察点
-
-- `Refine`
-- `PageIn`
-- Redis page save/load
-- Redis Stream enqueue/consume/ack
-- summary provider 调用
-
-### 第一批评测维度
-
-- 压缩前后 Token 比例
-- budget 达标率
-- page-out 比例
-- 引文保留率
-- code fence 保留率
-- error stack 保留率
-- summary 命中率
-
-## Phase 4：结构化策略深化
-
-### 当前已完成起点
-
-- `json_trim`
-- `table_reduce`
-- `code_outline`
-- `error_stack_focus`
-
-### 建议下一批处理器
-
-- `log_dedup`
-- `tool_output_focus`
-- `rag_rerank_trim`
-
-### 进入条件
-
-- 必须先有测试样本和回归基线
-- 否则很容易只得到“压缩率更高”而不是“语义更稳”
-
-## Phase 5：缓存复用与多级治理
-
-### 目标
-
-把单次请求压缩，升级成跨请求可复用的上下文治理。
-
-### 当前已完成的第一步
-
-- prompt 改成 `stable context -> conversation memory -> active turn`
-- 新增 `canonicalize`，稳定 `RAGChunk / sources` 顺序
-- page key 改成 content-addressed artifact key
-- summary job 与 page refs 开始围绕共享 artifact 工作
-
-### 关键方向
-
-- 基于 `content_hash` 的跨请求复用
-- page 级 / chunk 级 / session 级摘要层次
-- 热点上下文缓存
-- 版本和失效策略
-- prefix hit rate / cached artifact reuse 指标
+- 文档/RAG 入库质量可单独治理
+- 应用层 prefix 预测更接近真实 serving 复用语义
 
 ## 5. 推荐执行顺序
 
-建议按以下顺序推进：
+1. 先补 `service mapping / summary / config` 最小单测闭环
+2. 再补 `Refine / PageIn / Redis / worker` 集成测试与最小本地运行说明
+3. 再补 `dry_run / explain / cache debug / normalized preview`
+4. 再补 replay、dashboard、prefix churn 与 miss waterfall 评测闭环
+5. 再接真实外部摘要 provider，并补 retry / claim
+6. 再推进 chunk 级摘要索引与更细粒度生命周期治理
+7. 再推进 sentence-aware chunking、文档预处理与代码 cleaner SDK
+8. 最后推进四段 prefix 与 segment-level 部分复用
 
-1. 补最小本地运行方案
-2. 补单测与集成测试
-3. 补 Tracing
-4. 抽象 Summary Provider
-5. 接真实外部摘要模型
-6. 升级 Summary Artifact
-7. 增加 metrics dashboard 与告警
-8. 增加离线评测工具
-9. 增加 `log_dedup`
-10. 增加 `tool_output_focus`
-11. 增加 `rag_rerank_trim`
-12. 推进更深层的跨请求缓存复用
+## 6. 当前最大的风险
 
-## 6. 最近两轮迭代建议
-
-### 迭代 A：让系统真正“可验证”
-
-产出建议：
-
-- 本地运行说明
-- 样例配置
-- tokenizer / paging / worker 单测
-- `Refine` / `PageIn` 集成测试
-- 文档与实际代码一致性清理
-
-### 迭代 B：让摘要链路真正“可升级”
-
-产出建议：
-
-- Summary Provider 抽象
-- Heuristic Provider
-- LLM Provider 占位实现
-- 结构化 Summary Artifact
-- summary 失效策略
-
-## 7. 当前最大的风险
-
-### 风险 1：继续堆新处理器，忽略测试和评测
+### 风险 1：继续堆新规则，但没有测试闭环
 
 后果：
 
-- 很难证明策略变更是否有效
-- 一旦语义损伤，定位困难
+- 无法证明策略变更真的提升收益
+- 一旦伤语义，很难回滚和定位
 
-### 风险 2：误把启发式摘要当成最终方案
-
-后果：
-
-- 难以跨环境复用
-- 难以控制摘要质量
-
-### 风险 3：没有观测能力就开始复杂优化
+### 风险 2：把启发式摘要底座误判为摘要产品化完成
 
 后果：
 
-- 只能靠体感调优
-- KPI 不可信
+- 真实业务质量不可控
+- 生命周期与 provider 演进空间不足
 
-## 8. 结论
+### 风险 3：只有应用层预测，没有评测与对照
 
-当前最合理的推进方式不是“继续扩更多规则”，而是：
+后果：
 
-1. 先让系统可运行、可测试、可观察
-2. 再把摘要链路抽象稳
-3. 再继续做复杂策略和缓存复用
+- 会高估 prefix cache 优化的真实收益
+- 很难判断哪些规范化动作值得保留
 
-这也是后续所有计划拆分的总原则。
+## 7. 结论
+
+当前最合理的推进方式不是继续做“更多处理步骤”，而是：
+
+1. 先把测试、Explain、评测这条证据链补齐
+2. 再把摘要链路从启发式底座升级成可演进能力
+3. 最后再继续做更深的入库预处理和缓存语义优化
+
+这也是接下来文档、代码和任务排序应共同遵循的主线。

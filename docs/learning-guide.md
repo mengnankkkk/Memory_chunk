@@ -1,7 +1,7 @@
 # Context Refiner 学习解析文档
 
-- 文档版本：`v2026.04.11`
-- 更新日期：`2026-04-11`
+- 文档版本：`v2026.04.19`
+- 更新日期：`2026-04-19`
 - 文档类型：`Learning Guide`
 - 适用代码基线：`main` 分支当前实现
 
@@ -13,7 +13,7 @@
 - 想系统理解代码而不是只会跑命令的人
 - 想把这个项目当成“上下文治理服务范例”来学习的人
 
-> 2026-04-11 之后，代码结构已重构为 `adapter -> service -> core -> infra` 分层。
+> 当前代码结构已收敛为 `controller -> service -> domain -> support -> bootstrap`。
 > 学习目录职责时请先结合 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md) 一起看。
 
 ## 2. 学这个项目之前，先抓住两个核心问题
@@ -107,10 +107,10 @@
 
 读：
 
-- [internal/domain/core/processor/paging_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/paging_processor.go)
-- [internal/domain/core/processor/collapse_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/collapse_processor.go)
-- [internal/domain/core/processor/structured_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/structured_processors.go)
-- [internal/domain/core/processor/auto_compact_processor.go](/E:/github/Memory_chunk/internal/domain/core/processor/auto_compact_processor.go)
+- [internal/domain/core/processor/stage_01_preprocess_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_01_preprocess_processors.go)
+- [internal/domain/core/processor/stage_02_transform_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_02_transform_processors.go)
+- [internal/domain/core/processor/stage_03_compaction_processors.go](/E:/github/Memory_chunk/internal/domain/core/processor/stage_03_compaction_processors.go)
+- [internal/domain/core/components/text_sanitizer.go](/E:/github/Memory_chunk/internal/domain/core/components/text_sanitizer.go)
 - [internal/support/heuristic/extract.go](/E:/github/Memory_chunk/internal/support/heuristic/extract.go)
 
 学习时不要只看“做了什么”，还要看“为什么这一类逻辑被拆成独立 Processor”。
@@ -120,8 +120,8 @@
 读：
 
 - [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
-- [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
-- [internal/adapter/outbound/summary/summary_worker.go](/E:/github/Memory_chunk/internal/adapter/outbound/summary/summary_worker.go)
+- [internal/support/redis/redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go)
+- [internal/support/summary/summary_worker.go](/E:/github/Memory_chunk/internal/support/summary/summary_worker.go)
 - [internal/infra/config/config.go](/E:/github/Memory_chunk/internal/infra/config/config.go)
 
 你要理解：
@@ -141,7 +141,7 @@
 4. [internal/service/refine_service.go](/E:/github/Memory_chunk/internal/service/refine_service.go)
 5. [internal/domain/core/pipeline.go](/E:/github/Memory_chunk/internal/domain/core/pipeline.go)
 6. [internal/domain/core/repository/repository_contracts.go](/E:/github/Memory_chunk/internal/domain/core/repository/repository_contracts.go)
-7. [internal/adapter/outbound/redis/redis_repository.go](/E:/github/Memory_chunk/internal/adapter/outbound/redis/redis_repository.go)
+7. [internal/support/redis/redis_repository.go](/E:/github/Memory_chunk/internal/support/redis/redis_repository.go)
 
 这样至少能理解主干。
 
@@ -150,7 +150,7 @@
 1. 阅读 [docs/context-refiner-design.md](/E:/github/Memory_chunk/docs/context-refiner-design.md)
 2. 阅读 [docs/layered-architecture.md](/E:/github/Memory_chunk/docs/layered-architecture.md)
 3. 阅读 [docs/principles-and-internals.md](/E:/github/Memory_chunk/docs/principles-and-internals.md)
-4. 逐个过 `api -> adapter -> service -> core -> infra`
+4. 逐个过 `api -> controller -> service -> domain -> support -> bootstrap`
 5. 手动画一条 `Refine` 主链
 6. 手动画一条 `PageIn` 主链
 7. 对照 [docs/todolist.md](/E:/github/Memory_chunk/docs/todolist.md) 看哪些是已完成、哪些是未来计划

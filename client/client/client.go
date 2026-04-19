@@ -4,7 +4,7 @@ import (
 	"context"
 
 	refinerv1 "context-refiner/api/refinerv1"
-	serviceapi "context-refiner/pkg/service"
+	serviceapi "context-refiner/client/service"
 )
 
 type Client struct {
