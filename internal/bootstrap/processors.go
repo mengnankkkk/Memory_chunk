@@ -12,6 +12,7 @@ func buildRegistry(counter core.TokenCounter, pageStore repository.PageRepositor
 		processor.NewPagingProcessor(counter, pageStore, pagingLimit),
 		processor.NewCollapseProcessor(counter),
 		processor.NewCompactProcessor(counter),
+		processor.NewSanitizeProcessor(counter),
 		processor.NewCanonicalizeProcessor(counter),
 		processor.NewJSONTrimProcessor(counter),
 		processor.NewTableReduceProcessor(counter),
