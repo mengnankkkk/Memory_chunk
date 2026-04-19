@@ -2,9 +2,7 @@ package core
 
 import (
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
-	"net/url"
 	"strings"
 )
 
@@ -69,11 +67,11 @@ func BuildPrefixCacheIdentity(req *RefineRequest, counter TokenCounter) PrefixCa
 	systemMessages, memoryMessages, _ := StablePromptSegments(nilSafeMessages(req))
 	stableChunks := StableRAGChunks(nilSafeChunks(req))
 
-	systemPrompt := renderMessageSection("# Stable System", systemMessages)
-	memoryPrompt := renderMessageSection("# Conversation Memory", memoryMessages)
-	ragPrompt := renderRAGSection("# Stable Context", stableChunks)
-	conversationPrompt := renderMessageSection("# Conversation Memory", append(append([]Message(nil), systemMessages...), memoryMessages...))
-	stablePrompt := strings.TrimSpace(strings.Join(nonEmptyParts(ragPrompt, conversationPrompt), "\n\n"))
+	systemPrompt := buildMessageSection("# Stable System", systemMessages)
+	memoryPrompt := buildMessageSection("# Conversation Memory", memoryMessages)
+	ragPrompt := buildRAGSection("# Stable Context", stableChunks)
+	conversationPrompt := buildMessageSection("# Conversation Memory", append(append([]Message(nil), systemMessages...), memoryMessages...))
+	stablePrompt := joinSectionLines(ragPrompt, conversationPrompt)
 
 	identity := PrefixCacheIdentity{
 		ModelID:              modelID,
@@ -109,61 +107,34 @@ func BuildPrefixCacheIdentityFromSegments(modelID string, systemPrompt string, m
 	if modelID == "" {
 		modelID = "unknown"
 	}
-	systemPrompt = strings.TrimSpace(NormalizeTextContent(systemPrompt, "system"))
-	memoryPrompt = strings.TrimSpace(NormalizeTextContent(memoryPrompt, "memory"))
-	ragPrompt = strings.TrimSpace(NormalizeTextContent(ragPrompt, "rag"))
-	if ragPrompt != "" {
-		ragPrompt = strings.TrimSpace(strings.Join(nonEmptyParts("# Stable Context\n## RAG\n"+ragPrompt), "\n\n"))
-	}
-	if systemPrompt != "" {
-		systemPrompt = strings.TrimSpace(strings.Join(nonEmptyParts("# Stable System\n"+systemPrompt), "\n\n"))
-	}
-	if memoryPrompt != "" {
-		memoryPrompt = strings.TrimSpace(strings.Join(nonEmptyParts("# Conversation Memory\n"+memoryPrompt), "\n\n"))
-	}
-	conversationPrompt := strings.TrimSpace(strings.Join(nonEmptyParts(systemPrompt, memoryPrompt), "\n\n"))
-	stablePrompt := strings.TrimSpace(strings.Join(nonEmptyParts(ragPrompt, conversationPrompt), "\n\n"))
+	sections := defaultPromptComponent.BuildStablePrefixSections(systemPrompt, memoryPrompt, ragPrompt)
 	identity := PrefixCacheIdentity{
 		ModelID:              modelID,
-		StablePrefixPrompt:   stablePrompt,
-		SystemPrefixPrompt:   systemPrompt,
-		MemoryPrefixPrompt:   memoryPrompt,
-		RAGPrefixPrompt:      ragPrompt,
+		StablePrefixPrompt:   sections.StablePrompt,
+		SystemPrefixPrompt:   sections.SystemPrompt,
+		MemoryPrefixPrompt:   sections.MemoryPrompt,
+		RAGPrefixPrompt:      sections.RAGPrompt,
 		NormalizationVersion: "stable-prefix-v2",
 	}
-	if stablePrompt != "" {
-		identity.CombinedPrefixHash = hashStrings(modelID, stablePrompt)
+	if sections.StablePrompt != "" {
+		identity.CombinedPrefixHash = hashStrings(modelID, sections.StablePrompt)
 	}
-	if systemPrompt != "" {
-		identity.SystemPrefixHash = hashStrings(modelID, systemPrompt)
+	if sections.SystemPrompt != "" {
+		identity.SystemPrefixHash = hashStrings(modelID, sections.SystemPrompt)
 	}
-	if memoryPrompt != "" {
-		identity.MemoryPrefixHash = hashStrings(modelID, memoryPrompt)
+	if sections.MemoryPrompt != "" {
+		identity.MemoryPrefixHash = hashStrings(modelID, sections.MemoryPrompt)
 	}
-	if ragPrompt != "" {
-		identity.RAGPrefixHash = hashStrings(modelID, ragPrompt)
+	if sections.RAGPrompt != "" {
+		identity.RAGPrefixHash = hashStrings(modelID, sections.RAGPrompt)
 	}
 	if counter != nil {
-		identity.StablePrefixTokens = countIfPresent(counter, stablePrompt)
-		identity.SystemPrefixTokens = countIfPresent(counter, systemPrompt)
-		identity.MemoryPrefixTokens = countIfPresent(counter, memoryPrompt)
-		identity.RAGPrefixTokens = countIfPresent(counter, ragPrompt)
+		identity.StablePrefixTokens = countIfPresent(counter, sections.StablePrompt)
+		identity.SystemPrefixTokens = countIfPresent(counter, sections.SystemPrompt)
+		identity.MemoryPrefixTokens = countIfPresent(counter, sections.MemoryPrompt)
+		identity.RAGPrefixTokens = countIfPresent(counter, sections.RAGPrompt)
 	}
 	return identity
-}
-
-func NormalizeSourceLabel(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return ""
-	}
-	trimmed = strings.ReplaceAll(trimmed, "\\", "/")
-	if parsed, err := url.Parse(trimmed); err == nil && parsed.Scheme != "" && parsed.Host != "" {
-		parsed.Fragment = ""
-		parsed.RawQuery = ""
-		return strings.TrimSpace(parsed.String())
-	}
-	return normalizeWhitespace(trimmed)
 }
 
 func BuildPrefixNamespace(policy string, tenant string, modelID string, cfg PrefixNamespaceConfig) string {
@@ -197,59 +168,8 @@ func StableSegmentCount(identity PrefixCacheIdentity) int {
 	return count
 }
 
-func NormalizeFragments(fragments []RAGFragment) []RAGFragment {
-	out := make([]RAGFragment, 0, len(fragments))
-	for _, fragment := range fragments {
-		next := fragment
-		next.Language = strings.TrimSpace(strings.ToLower(fragment.Language))
-		next.Content = NormalizeFragmentContent(fragment)
-		out = append(out, next)
-	}
-	return out
-}
-
-func NormalizeFragmentContent(fragment RAGFragment) string {
-	switch fragment.Type {
-	case FragmentTypeJSON:
-		if normalized, ok := normalizeJSON(fragment.Content); ok {
-			return normalized
-		}
-		return NormalizeTextContent(fragment.Content, "rag")
-	case FragmentTypeCode:
-		return normalizeCodeContent(fragment.Content)
-	default:
-		return NormalizeTextContent(fragment.Content, "rag")
-	}
-}
-
 func hashStrings(parts ...string) string {
 	return fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(parts, "\n"))))
-}
-
-func renderRAGSection(title string, chunks []RAGChunk) string {
-	if len(chunks) == 0 {
-		return ""
-	}
-	var builder strings.Builder
-	builder.WriteString(title)
-	builder.WriteString("\n## RAG\n")
-	for _, chunk := range chunks {
-		builder.WriteString(renderChunk(chunk))
-	}
-	return strings.TrimSpace(builder.String())
-}
-
-func renderMessageSection(title string, messages []Message) string {
-	if len(messages) == 0 {
-		return ""
-	}
-	var builder strings.Builder
-	builder.WriteString(title)
-	builder.WriteString("\n")
-	for _, message := range messages {
-		builder.WriteString(renderMessage(message))
-	}
-	return strings.TrimSpace(builder.String())
 }
 
 func nilSafeMessages(req *RefineRequest) []Message {
@@ -266,103 +186,11 @@ func nilSafeChunks(req *RefineRequest) []RAGChunk {
 	return req.RAGChunks
 }
 
-func nonEmptyParts(parts ...string) []string {
-	out := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if strings.TrimSpace(part) == "" {
-			continue
-		}
-		out = append(out, strings.TrimSpace(part))
-	}
-	return out
-}
-
 func countIfPresent(counter TokenCounter, text string) int {
 	if counter == nil || strings.TrimSpace(text) == "" {
 		return 0
 	}
 	return counter.CountText(text)
-}
-
-func normalizeRole(value string) string {
-	role := strings.ToLower(strings.TrimSpace(value))
-	if role == "" {
-		return "user"
-	}
-	return role
-}
-
-func normalizeCodeContent(value string) string {
-	lines := strings.Split(strings.ReplaceAll(value, "\r\n", "\n"), "\n")
-	for i, line := range lines {
-		lines[i] = strings.TrimRight(line, " \t")
-	}
-	return strings.TrimSpace(strings.Join(lines, "\n"))
-}
-
-func normalizeJSON(value string) (string, bool) {
-	if strings.TrimSpace(value) == "" {
-		return "", true
-	}
-	var payload any
-	if err := json.Unmarshal([]byte(value), &payload); err != nil {
-		return "", false
-	}
-	payload = stripVolatileJSON(payload)
-	normalized, err := json.Marshal(payload)
-	if err != nil {
-		return "", false
-	}
-	return string(normalized), true
-}
-
-func stripVolatileJSON(value any) any {
-	switch typed := value.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(typed))
-		for key, item := range typed {
-			if _, ok := volatileJSONKeys[strings.ToLower(strings.TrimSpace(key))]; ok {
-				continue
-			}
-			out[key] = stripVolatileJSON(item)
-		}
-		return out
-	case []any:
-		out := make([]any, 0, len(typed))
-		for _, item := range typed {
-			out = append(out, stripVolatileJSON(item))
-		}
-		return out
-	default:
-		return typed
-	}
-}
-
-func normalizePageRefs(values []string) []string {
-	seen := make(map[string]string)
-	for _, value := range values {
-		trimmed := strings.TrimSpace(value)
-		if trimmed == "" {
-			continue
-		}
-		key := strings.ToLower(trimmed)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = trimmed
-	}
-	out := make([]string, 0, len(seen))
-	for _, value := range seen {
-		out = append(out, value)
-	}
-	for i := 0; i < len(out); i++ {
-		for j := i + 1; j < len(out); j++ {
-			if strings.ToLower(out[i]) > strings.ToLower(out[j]) {
-				out[i], out[j] = out[j], out[i]
-			}
-		}
-	}
-	return out
 }
 
 func firstNonBlank(values ...string) string {

@@ -1,4 +1,4 @@
-package core
+package components
 
 import (
 	"html"
@@ -33,7 +33,6 @@ var (
 		"updated_at":    {},
 		"correlationid": {},
 	}
-	defaultTextSanitizer = NewTextSanitizer()
 )
 
 type TextSanitizerProfile string
@@ -67,10 +66,6 @@ type textSanitizerStep struct {
 
 func NewTextSanitizer() *TextSanitizer {
 	return &TextSanitizer{}
-}
-
-func DefaultTextSanitizer() *TextSanitizer {
-	return defaultTextSanitizer
 }
 
 func (s *TextSanitizer) Sanitize(input string, profile TextSanitizerProfile) TextSanitizerResult {
@@ -133,6 +128,19 @@ func sanitizerStepsFor(profile TextSanitizerProfile) []textSanitizerStep {
 	}
 }
 
+func NormalizeWhitespace(value string) string {
+	lines := strings.Split(value, "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			lines[i] = ""
+			continue
+		}
+		lines[i] = strings.Join(strings.Fields(trimmed), " ")
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
 func compactLayout(input string) (string, bool) {
 	output := blankLinePattern.ReplaceAllString(input, "\n\n")
 	return output, output != input
@@ -154,7 +162,7 @@ func trimOuterSpace(input string) (string, bool) {
 }
 
 func normalizeWhitespaceStep(input string) (string, bool) {
-	output := normalizeWhitespace(input)
+	output := NormalizeWhitespace(input)
 	return output, output != input
 }
 
@@ -243,27 +251,6 @@ func removeUnicodeNoise(input string) (string, bool) {
 		return r
 	}, input)
 	return output, changed
-}
-
-func NormalizeTextContent(value string, segment string) string {
-	profile := TextSanitizerProfileStableText
-	if segment == "active_turn" {
-		profile = TextSanitizerProfileActiveTurn
-	}
-	return DefaultTextSanitizer().Sanitize(value, profile).Text
-}
-
-func normalizeWhitespace(value string) string {
-	lines := strings.Split(value, "\n")
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
-			lines[i] = ""
-			continue
-		}
-		lines[i] = strings.Join(strings.Fields(trimmed), " ")
-	}
-	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
 func normalizeKeyLikeValue(input string, key string, replacement string) string {

@@ -57,6 +57,8 @@
 - 当前前缀分段仍为 `system / memory / rag` 三段，`tools` schema 被并入 system，变更时会触发误判
 - 当前 miss 诊断仍是"整条前缀"粒度，尚无 segment-level 部分复用语义
 - 当前 active turn 完全不归一化，多轮同话题复用潜力未被挖掘
+- 当前基础清洗更偏"在线 prompt 规范化与压缩"而非"离线入库预处理"：
+  说明：已有 `collapse / compact / canonicalize / json_trim / table_reduce / code_outline / error_stack_focus / snip`，但尚未形成独立 `TextSanitizer`、文档预处理管线或代码 cleaner SDK
 
 ## 2. 未完成任务
 
@@ -137,7 +139,38 @@
 - [ ] **NEW 2026-04-18** 应用层预测 vs 下游真实命中的相关性仪表盘
   说明：依赖 2.3.3 的下游 KV 指标接入能力，用于持续校准应用层预测的有效性
 
-### 2.4 其他增强
+### 2.4 基础清洗与入库预处理补齐
+
+- [ ] 设计独立 `TextSanitizer` 组件
+  说明：当前清洗规则分散在 `collapse / compact / canonicalize` 与若干 heuristic 中，缺少统一入口、统一配置、统一输出；拟收口为“原始文本 -> 干净文本 + 清洗报告”的独立组件
+- [ ] 补齐通用文本去噪规则
+  说明：当前已支持空白归一化、时间戳/UUID/trace/request/session 等高抖动字段规范化，以及 JSON 稳定化；但尚未支持 HTML 标签剥离、`script/style` 去除、emoji 去除、Unicode 控制字符过滤、XML 噪音清理
+- [ ] 为通用文本清洗增加可扩展 Hook
+  说明：内置规则之外，需允许业务侧按来源（scraping / log / docs / social）插入自定义 sanitizer rule，避免把项目内通用规则写死
+- [ ] 增加统一清洗报告对象
+  说明：当前只有 step audit 与 trace evaluation 分散记录；拟补 `sanitizer report`，至少包含输入 token、输出 token、删除字符/片段数、命中规则、去重率
+- [ ] 增加“句子切分 -> token chunk”预处理路径
+  说明：当前分页主要是按行/按 rune 切分，`SplitSentences` 仅用于摘要器；拟增加面向 RAG 入库的 sentence-aware chunking，避免正文在句中断裂
+- [ ] 设计结构化文档预处理管线
+  说明：目标链路为 `HTML/Markdown -> 标题层级识别 -> 章节拆分 -> 小 chunk 切分 -> 可选摘要 -> 入库`；当前系统只会消费已经结构化的 fragments，还不能从原始文档自动抽结构
+- [ ] 增加文档标题层级与章节边界识别
+  说明：支持 `H1/H2/H3`、Markdown 标题、常见知识库模板，保留章节结构，避免技术文档在切块后丢失上下文边界
+- [ ] 增加模板/导航/版权等 boilerplate 去重
+  说明：当前仅有 chunk 级重复合并，尚未专门识别文档模板、导航栏、版权声明、重复页脚等低价值重复内容
+- [ ] 增加正文与代码块分路处理
+  说明：当前只有在上游已标注 `FragmentTypeCode` 时才会走 `code_outline`；拟增加从 Markdown/HTML 自动识别 code fence / code block，并与正文分路处理
+- [ ] 设计代码上下文清洗器 SDK
+  说明：当前代码侧只有 `code_outline`、轻量尾随空格处理和超长片段 `snip`，尚未形成独立代码清洗器抽象
+- [ ] 增加多语言安全删注释能力
+  说明：拟支持至少 `Go / Java / Python / JavaScript / TypeScript / YAML` 常见语法，安全删除注释并保护字符串、URL、正则、shell 片段不被误伤
+- [ ] 增加代码空行压缩与生成代码/重复块识别
+  说明：当前没有 AST / parser 级代码清洗，也没有复制块/生成文件识别；拟补低风险重复块识别和生成代码降权/裁剪策略
+- [ ] 增加“摘要 + 签名 + 关键实现”混合代码 chunk 策略
+  说明：当前 `code_outline` 只抽签名线；拟为每个文件生成“文件摘要 / 重要函数签名 / 小段关键实现”的混合 chunk，提高代码 RAG 信息密度
+- [ ] 为基础清洗补评测基线
+  说明：需要分别评估文本去噪率、文档模板去重率、代码 chunk 有效密度、回答质量变化，避免只做规则堆叠
+
+### 2.5 其他增强
 
 - [ ] 增加压缩效果评测工具
 - [ ] 增加 `log_dedup`
@@ -146,15 +179,16 @@
 - [ ] **NEW 2026-04-18** RAG 语义去重（embedding 相似度阈值合并）
   说明：当前 RAG chunks 仅做稳定排序，未处理跨 chunk 的语义重复。低相关与语义重复是降低回答质量的两大来源，拟在 rerank 之后增加一层 embedding 去重层，阈值内视为同一语义事实并保留分数最高的那一段
 
-### 2.5 当前建议顺序（更新 2026-04-18）
+### 2.6 当前建议顺序（更新 2026-04-18）
 
 1. 先补 `service mapping / summary / config` 最小单测闭环
 2. 再补 `Refine / PageIn / Redis / worker` 集成测试，并继续收拢到 `tests/integration`
-3. 然后推进 `Explain / dry-run / cache debug`，把预测结果做成可解释输出
-4. 启动前缀四段分层（tools 独立）与 active turn 轻量去抖，作为 KV 命中优化的下一块基石
-5. 再补应用层低基数 metrics、dashboard 与离线 replay
-6. 接真实摘要 provider，升级 `SummaryArtifact` 到 chunk 级
-7. 设计 segment-level 部分复用语义，并尝试接入下游真实 KV 指标做对照验证
+3. 然后补齐“基础清洗与入库预处理”专题，优先落 `TextSanitizer`、sentence-aware chunking、文档标题分段与代码注释安全清洗
+4. 再推进 `Explain / dry-run / cache debug`，把预测结果做成可解释输出
+5. 启动前缀四段分层（tools 独立）与 active turn 轻量去抖，作为 KV 命中优化的下一块基石
+6. 再补应用层低基数 metrics、dashboard 与离线 replay
+7. 接真实摘要 provider，升级 `SummaryArtifact` 到 chunk 级
+8. 设计 segment-level 部分复用语义，并尝试接入下游真实 KV 指标做对照验证
 
 ## 3. 已完成任务归档
 

@@ -5,15 +5,16 @@ import (
 	"fmt"
 
 	"context-refiner/internal/domain/core"
+	"context-refiner/internal/domain/core/components"
 )
 
 type CompactProcessor struct {
 	counter   core.TokenCounter
-	sanitizer *core.TextSanitizer
+	sanitizer *components.TextSanitizer
 }
 
 func NewCompactProcessor(counter core.TokenCounter) *CompactProcessor {
-	return &CompactProcessor{counter: counter, sanitizer: core.NewTextSanitizer()}
+	return &CompactProcessor{counter: counter, sanitizer: components.NewTextSanitizer()}
 }
 
 func (p *CompactProcessor) Descriptor() core.ProcessorDescriptor {
@@ -32,13 +33,13 @@ func (p *CompactProcessor) Process(_ context.Context, req *core.RefineRequest) (
 	charDelta := 0
 
 	for i, msg := range updated.Messages {
-		after := p.sanitizer.Sanitize(msg.Content, core.TextSanitizerProfileCompactLayout).Text
+		after := p.sanitizer.Sanitize(msg.Content, components.TextSanitizerProfileCompactLayout).Text
 		charDelta += len(msg.Content) - len(after)
 		updated.Messages[i].Content = after
 	}
 	for i, chunk := range updated.RAGChunks {
 		for j, fragment := range chunk.Fragments {
-			after := p.sanitizer.Sanitize(fragment.Content, core.TextSanitizerProfileCompactLayout).Text
+			after := p.sanitizer.Sanitize(fragment.Content, components.TextSanitizerProfileCompactLayout).Text
 			charDelta += len(fragment.Content) - len(after)
 			updated.RAGChunks[i].Fragments[j].Content = after
 		}

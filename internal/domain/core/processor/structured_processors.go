@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"context-refiner/internal/domain/core"
+	"context-refiner/internal/domain/core/components"
 	"context-refiner/internal/support/heuristic"
 )
 
@@ -174,25 +175,14 @@ func runFragmentContentTransform(
 	reasons []string,
 ) (*core.RefineRequest, core.ProcessResult, error) {
 	updated := cloneRequest(req)
-	changed := 0
-	for i, chunk := range updated.RAGChunks {
-		for j, fragment := range chunk.Fragments {
-			if fragment.Type != targetType {
-				continue
-			}
-			next := transform(fragment.Content)
-			if next == fragment.Content {
-				continue
-			}
-			updated.RAGChunks[i].Fragments[j].Content = next
-			changed++
-		}
-	}
+	transformer := components.NewFragmentTransformer()
+	nextChunks, report := transformer.TransformChunks(toComponentChunks(updated.RAGChunks), string(targetType), transform)
+	updated.RAGChunks = fromComponentChunks(nextChunks)
 	updated.CurrentTokens = counter.CountRequest(updated)
 	return updated, core.ProcessResult{
-		Details: map[string]string{detailKey: fmt.Sprintf("%d", changed)},
+		Details: map[string]string{detailKey: fmt.Sprintf("%d", report.ChangedFragments)},
 		Semantic: core.StepSemanticAudit{
-			Removed:             appendNonEmpty(nil, fmt.Sprintf("%s=%d", detailKey, changed)),
+			Removed:             appendNonEmpty(nil, fmt.Sprintf("%s=%d", detailKey, report.ChangedFragments)),
 			Retained:            appendNonEmpty(nil, retained...),
 			Reasons:             appendNonEmpty(nil, reasons...),
 			SourcePreserved:     true,

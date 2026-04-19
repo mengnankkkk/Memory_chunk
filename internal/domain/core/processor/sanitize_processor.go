@@ -7,17 +7,18 @@ import (
 	"strings"
 
 	"context-refiner/internal/domain/core"
+	"context-refiner/internal/domain/core/components"
 )
 
 type SanitizeProcessor struct {
 	counter   core.TokenCounter
-	sanitizer *core.TextSanitizer
+	sanitizer *components.TextSanitizer
 }
 
 func NewSanitizeProcessor(counter core.TokenCounter) *SanitizeProcessor {
 	return &SanitizeProcessor{
 		counter:   counter,
-		sanitizer: core.NewTextSanitizer(),
+		sanitizer: components.NewTextSanitizer(),
 	}
 }
 
@@ -42,7 +43,7 @@ func (p *SanitizeProcessor) Process(_ context.Context, req *core.RefineRequest) 
 		if isActiveTurnMessage(i, len(updated.Messages), msg.Role) {
 			continue
 		}
-		result := p.sanitizer.Sanitize(msg.Content, core.TextSanitizerProfileRichText)
+		result := p.sanitizer.Sanitize(msg.Content, components.TextSanitizerProfileRichText)
 		if result.Text == msg.Content {
 			continue
 		}
@@ -57,7 +58,7 @@ func (p *SanitizeProcessor) Process(_ context.Context, req *core.RefineRequest) 
 			if !sanitizeEligible(fragment.Type) {
 				continue
 			}
-			result := p.sanitizer.Sanitize(fragment.Content, core.TextSanitizerProfileRichText)
+			result := p.sanitizer.Sanitize(fragment.Content, components.TextSanitizerProfileRichText)
 			if result.Text == fragment.Content {
 				continue
 			}

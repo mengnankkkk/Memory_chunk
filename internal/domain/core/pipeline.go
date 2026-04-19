@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"context-refiner/internal/domain/core/components"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	otelcodes "go.opentelemetry.io/otel/codes"
@@ -304,42 +305,14 @@ func extractPagedChunks(req *RefineRequest) []PagedChunk {
 }
 
 func AssemblePrompt(req *RefineRequest) string {
-	var builder strings.Builder
-	stableChunks := StableRAGChunks(req.RAGChunks)
-	stableMessages, dynamicMessages := StablePromptMessages(req.Messages)
-	if len(stableChunks) > 0 {
-		builder.WriteString("# Stable Context\n")
-		builder.WriteString("## RAG\n")
-		for _, chunk := range stableChunks {
-			builder.WriteString(renderChunk(chunk))
-		}
-		builder.WriteString("\n")
-	}
-	if len(stableMessages) > 0 {
-		builder.WriteString("# Conversation Memory\n")
-		for _, msg := range stableMessages {
-			builder.WriteString(renderMessage(msg))
-		}
-		builder.WriteString("\n")
-	}
-	if len(dynamicMessages) > 0 {
-		builder.WriteString("# Active Turn\n")
-		for _, msg := range dynamicMessages {
-			builder.WriteString(renderMessage(msg))
-		}
-	}
-	return strings.TrimSpace(builder.String())
+	return defaultPromptComponent.AssemblePrompt(toPromptMessages(req.Messages), toComponentChunks(req.RAGChunks))
 }
 
 func StableRAGChunks(chunks []RAGChunk) []RAGChunk {
 	stable := make([]RAGChunk, 0, len(chunks))
+	normalizer := defaultRAGNormalizer
 	for _, chunk := range chunks {
-		next := chunk
-		next.Source = NormalizeSourceLabel(chunk.Source)
-		next.Sources = StableSources(chunk.Sources, chunk.Source)
-		next.Fragments = NormalizeFragments(chunk.Fragments)
-		next.PageRefs = normalizePageRefs(chunk.PageRefs)
-		stable = append(stable, next)
+		stable = append(stable, fromComponentChunk(normalizer.NormalizeChunk(toComponentChunk(chunk)).Chunk))
 	}
 	sort.SliceStable(stable, func(i, j int) bool {
 		left := stableChunkSortKey(stable[i])
@@ -353,82 +326,25 @@ func StableRAGChunks(chunks []RAGChunk) []RAGChunk {
 }
 
 func StablePromptMessages(messages []Message) ([]Message, []Message) {
-	systemMessages, memoryMessages, activeMessages := StablePromptSegments(messages)
-	return append(systemMessages, memoryMessages...), activeMessages
+	stable, active := defaultPromptComponent.StablePromptMessages(toPromptMessages(messages))
+	return fromPromptMessages(stable), fromPromptMessages(active)
 }
 
 func StablePromptSegments(messages []Message) ([]Message, []Message, []Message) {
-	if len(messages) == 0 {
-		return nil, nil, nil
-	}
-	normalized := make([]Message, 0, len(messages))
-	for _, message := range messages {
-		segment := "memory"
-		if normalizeRole(message.Role) == "system" {
-			segment = "system"
-		}
-		normalized = append(normalized, Message{
-			Role:    normalizeRole(message.Role),
-			Content: NormalizeTextContent(message.Content, segment),
-		})
-	}
-	if len(normalized) == 1 {
-		normalized[0].Content = NormalizeTextContent(messages[0].Content, "active_turn")
-		return nil, nil, append([]Message(nil), normalized[0])
-	}
-
-	active := append([]Message(nil), normalized[len(normalized)-1])
-	active[0].Content = NormalizeTextContent(messages[len(messages)-1].Content, "active_turn")
-	stable := normalized[:len(normalized)-1]
-	systemMessages := make([]Message, 0)
-	memoryMessages := make([]Message, 0)
-	for _, message := range stable {
-		if message.Role == "system" {
-			systemMessages = append(systemMessages, message)
-			continue
-		}
-		memoryMessages = append(memoryMessages, message)
-	}
-	return systemMessages, memoryMessages, active
+	system, memory, active := defaultPromptComponent.StablePromptSegments(toPromptMessages(messages))
+	return fromPromptMessages(system), fromPromptMessages(memory), fromPromptMessages(active)
 }
 
 func StableSources(values []string, fallback string) []string {
-	candidates := append([]string(nil), values...)
-	if len(candidates) == 0 && strings.TrimSpace(fallback) != "" {
-		candidates = append(candidates, fallback)
-	}
-	seen := make(map[string]string)
-	for _, value := range candidates {
-		normalized := NormalizeSourceLabel(value)
-		if normalized == "" {
-			continue
-		}
-		key := strings.ToLower(normalized)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = normalized
-	}
-	out := make([]string, 0, len(seen))
-	for _, value := range seen {
-		out = append(out, value)
-	}
-	sort.SliceStable(out, func(i, j int) bool {
-		return strings.ToLower(out[i]) < strings.ToLower(out[j])
-	})
-	return out
+	return defaultRAGNormalizer.StableSources(values, fallback)
 }
 
 func renderChunk(chunk RAGChunk) string {
-	sourceLabel := strings.Join(chunk.Sources, ", ")
-	if sourceLabel == "" {
-		sourceLabel = "unknown"
-	}
-	return fmt.Sprintf("- (%s)\n%s\n", sourceLabel, strings.TrimSpace(ChunkText(chunk)))
+	return defaultPromptComponent.RenderChunk(toComponentChunk(chunk))
 }
 
 func renderMessage(msg Message) string {
-	return fmt.Sprintf("[%s]\n%s\n\n", strings.ToUpper(strings.TrimSpace(msg.Role)), strings.TrimSpace(msg.Content))
+	return defaultPromptComponent.RenderMessage(components.PromptMessage{Role: msg.Role, Content: msg.Content})
 }
 
 func stableChunkSortKey(chunk RAGChunk) string {
@@ -448,43 +364,15 @@ func stableChunkTieKey(chunk RAGChunk) string {
 }
 
 func ChunkText(chunk RAGChunk) string {
-	return FragmentsText(chunk.Fragments)
+	return defaultPromptComponent.ChunkText(toComponentChunk(chunk))
 }
 
 func FragmentsText(fragments []RAGFragment) string {
-	parts := make([]string, 0, len(fragments))
-	for _, fragment := range fragments {
-		rendered := FragmentText(fragment)
-		if strings.TrimSpace(rendered) != "" {
-			parts = append(parts, rendered)
-		}
-	}
-	return strings.TrimSpace(strings.Join(parts, "\n\n"))
+	return defaultPromptComponent.FragmentsText(toComponentFragments(fragments))
 }
 
 func FragmentText(fragment RAGFragment) string {
-	content := strings.TrimSpace(fragment.Content)
-	if content == "" {
-		return ""
-	}
-	switch fragment.Type {
-	case FragmentTypeCode:
-		return fmt.Sprintf("```%s\n%s\n```", strings.TrimSpace(fragment.Language), content)
-	case FragmentTypeTable:
-		return "Table:\n" + content
-	case FragmentTypeJSON:
-		return "JSON:\n" + content
-	case FragmentTypeToolOutput:
-		return "Tool Output:\n" + content
-	case FragmentTypeLog:
-		return "Log:\n" + content
-	case FragmentTypeErrorStack:
-		return "Error Stack:\n" + content
-	case FragmentTypeTitle:
-		return "Title: " + content
-	default:
-		return content
-	}
+	return defaultPromptComponent.FragmentText(toComponentFragment(fragment))
 }
 
 func cloneMap(src map[string]string) map[string]string {

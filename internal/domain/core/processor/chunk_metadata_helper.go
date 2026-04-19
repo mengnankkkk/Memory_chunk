@@ -3,12 +3,13 @@ package processor
 import (
 	"crypto/sha256"
 	"fmt"
-	"sort"
 	"strings"
-	"unicode/utf8"
 
 	"context-refiner/internal/domain/core"
+	"context-refiner/internal/domain/core/components"
 )
+
+var chunkMetadataHelper = components.NewChunkMetadataHelper()
 
 func appendNonEmpty(items []string, values ...string) []string {
 	for _, value := range values {
@@ -20,25 +21,15 @@ func appendNonEmpty(items []string, values ...string) []string {
 }
 
 func preserveFlags(chunk core.RAGChunk) (bool, bool) {
-	codeFence := false
-	errorStack := false
-	for _, fragment := range chunk.Fragments {
-		if fragment.Type == core.FragmentTypeCode || strings.Contains(fragment.Content, "```") {
-			codeFence = true
-		}
-		if fragment.Type == core.FragmentTypeErrorStack {
-			errorStack = true
-		}
-	}
-	return codeFence, errorStack
+	return chunkMetadataHelper.PreserveFlags(toComponentChunk(chunk))
 }
 
 func joinSources(chunk core.RAGChunk) []string {
-	return core.StableSources(chunk.Sources, chunk.Source)
+	return chunkMetadataHelper.JoinSources(toComponentChunk(chunk))
 }
 
 func safeRuneLen(text string) int {
-	return utf8.RuneCountInString(text)
+	return chunkMetadataHelper.SafeRuneLen(text)
 }
 
 func hashText(text string) string {
@@ -47,14 +38,5 @@ func hashText(text string) string {
 }
 
 func stableArtifactKeyParts(parts ...string) string {
-	items := make([]string, 0, len(parts))
-	for _, part := range parts {
-		value := strings.TrimSpace(strings.ToLower(part))
-		if value == "" {
-			continue
-		}
-		items = append(items, sanitizeKeyPart(value))
-	}
-	sort.Strings(items)
-	return strings.Join(items, ":")
+	return chunkMetadataHelper.StableArtifactKey(parts...)
 }

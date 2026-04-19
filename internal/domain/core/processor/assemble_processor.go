@@ -5,14 +5,21 @@ import (
 	"strconv"
 
 	"context-refiner/internal/domain/core"
+	"context-refiner/internal/domain/core/components"
 )
 
 type AssembleProcessor struct {
-	counter core.TokenCounter
+	counter         core.TokenCounter
+	promptComponent *components.PromptComponent
+	ragNormalizer   *components.RAGNormalizer
 }
 
 func NewAssembleProcessor(counter core.TokenCounter) *AssembleProcessor {
-	return &AssembleProcessor{counter: counter}
+	return &AssembleProcessor{
+		counter:         counter,
+		promptComponent: components.NewPromptComponent(),
+		ragNormalizer:   components.NewRAGNormalizer(),
+	}
 }
 
 func (p *AssembleProcessor) Descriptor() core.ProcessorDescriptor {
@@ -28,15 +35,15 @@ func (p *AssembleProcessor) Descriptor() core.ProcessorDescriptor {
 
 func (p *AssembleProcessor) Process(_ context.Context, req *core.RefineRequest) (*core.RefineRequest, core.ProcessResult, error) {
 	updated := cloneRequest(req)
-	updated.OptimizedPrompt = core.AssemblePrompt(updated)
+	updated.OptimizedPrompt = p.promptComponent.AssemblePrompt(toPromptMessages(updated.Messages), toComponentChunks(updated.RAGChunks))
 	if updated.Metadata == nil {
 		updated.Metadata = make(map[string]string)
 	}
-	systemMessages, memoryMessages, dynamicMessages := core.StablePromptSegments(updated.Messages)
+	systemMessages, memoryMessages, dynamicMessages := p.promptComponent.StablePromptSegments(toPromptMessages(updated.Messages))
 	identity := core.BuildPrefixCacheIdentity(updated, p.counter)
 	updated.Metadata["prompt_layout"] = "stable-context-first"
 	updated.Metadata["stable_prefix_tokens"] = strconv.Itoa(identity.StablePrefixTokens)
-	updated.Metadata["stable_rag_chunks"] = strconv.Itoa(len(core.StableRAGChunks(updated.RAGChunks)))
+	updated.Metadata["stable_rag_chunks"] = strconv.Itoa(len(p.ragNormalizer.StableChunks(toComponentChunks(updated.RAGChunks))))
 	updated.Metadata["stable_messages"] = strconv.Itoa(len(systemMessages) + len(memoryMessages))
 	updated.Metadata["stable_system_messages"] = strconv.Itoa(len(systemMessages))
 	updated.Metadata["stable_memory_messages"] = strconv.Itoa(len(memoryMessages))

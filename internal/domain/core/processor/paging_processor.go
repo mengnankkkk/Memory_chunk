@@ -3,7 +3,6 @@ package processor
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"context-refiner/internal/domain/core"
 	"context-refiner/internal/domain/core/repository"
@@ -117,13 +116,4 @@ func contentAddressedPageKey(chunk core.RAGChunk, contentHash string, pageIndex 
 		contentHash,
 		pageIndex,
 	)
-}
-
-func sanitizeKeyPart(value string) string {
-	value = strings.TrimSpace(strings.ToLower(value))
-	if value == "" {
-		return "unknown"
-	}
-	replacer := strings.NewReplacer(" ", "-", ":", "-", "/", "-", "\\", "-", "|", "-")
-	return replacer.Replace(value)
 }
